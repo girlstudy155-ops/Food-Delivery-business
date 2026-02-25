@@ -1,61 +1,98 @@
-// template
-import { isLiquidGlassAvailable } from "expo-glass-effect";
-import { Tabs } from "expo-router";
-import { NativeTabs, Icon, Label } from "expo-router/unstable-native-tabs";
-import { BlurView } from "expo-blur";
-import { SymbolView } from "expo-symbols";
-import { Platform, StyleSheet, useColorScheme } from "react-native";
 import React from "react";
+import { Platform, View, StyleSheet } from "react-native";
+import { Tabs, router } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { BlurView } from "expo-blur";
+import { useCart } from "@/contexts/cart";
+import { useAuth } from "@/contexts/auth";
+import colors from "@/constants/colors";
+import { Text } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import Colors from "@/constants/colors";
-
-//IMPORTANT: iOS 26 Exists, feel free to use NativeTabs for native tabs with liquid glass support.
-function NativeTabLayout() {
+function CartBadge({ count }: { count: number }) {
+  if (count === 0) return null;
   return (
-    <NativeTabs>
-      <NativeTabs.Trigger name="index">
-        <Icon sf={{ default: "house", selected: "house.fill" }} />
-        <Label>Home</Label>
-      </NativeTabs.Trigger>
-    </NativeTabs>
+    <View style={styles.badge}>
+      <Text style={styles.badgeText}>{count > 99 ? "99+" : count}</Text>
+    </View>
   );
 }
 
-function ClassicTabLayout() {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
+export default function TabLayout() {
+  const { totalItems } = useCart();
+  const { isAdmin } = useAuth();
+  const insets = useSafeAreaInsets();
+  const isWeb = Platform.OS === "web";
+  const isIOS = Platform.OS === "ios";
+
+  // Redirect admin away from tabs
+  React.useEffect(() => {
+    if (isAdmin) router.replace("/(admin)");
+  }, [isAdmin]);
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors.light.tint,
-        tabBarInactiveTintColor: Colors.light.tabIconDefault,
-        headerShown: true,
+        headerShown: false,
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.tabBarInactive,
         tabBarStyle: {
           position: "absolute",
-          backgroundColor: Platform.select({
-            ios: "transparent",
-            android: isDark ? "#000" : "#fff",
-          }),
-          borderTopWidth: 0,
+          backgroundColor: isIOS ? "transparent" : "#FFFFFF",
+          borderTopWidth: isWeb ? 1 : 0,
+          borderTopColor: colors.border,
           elevation: 0,
+          ...(isWeb ? { height: 84 } : {}),
+          ...(Platform.OS === "android" ? {
+            height: 60 + insets.bottom,
+            paddingBottom: insets.bottom,
+          } : {}),
         },
         tabBarBackground: () =>
-          Platform.OS === "ios" ? (
-            <BlurView
-              intensity={100}
-              tint={isDark ? "dark" : "light"}
-              style={StyleSheet.absoluteFill}
-            />
+          isIOS ? (
+            <BlurView intensity={95} tint="light" style={StyleSheet.absoluteFill} />
+          ) : isWeb ? (
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: "#FFFFFF" }]} />
           ) : null,
+        tabBarLabelStyle: { fontSize: 11, fontWeight: "600", marginBottom: 2 },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
           title: "Home",
-          tabBarIcon: ({ color }) => (
-            <SymbolView name="house" tintColor={color} size={24} />
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "home" : "home-outline"} size={24} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="offers"
+        options={{
+          title: "Offers",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "pricetag" : "pricetag-outline"} size={24} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="cart"
+        options={{
+          title: "Cart",
+          tabBarIcon: ({ color, focused }) => (
+            <View>
+              <Ionicons name={focused ? "cart" : "cart-outline"} size={24} color={color} />
+              <CartBadge count={totalItems} />
+            </View>
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="orders"
+        options={{
+          title: "Orders",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "receipt" : "receipt-outline"} size={24} color={color} />
           ),
         }}
       />
@@ -63,9 +100,24 @@ function ClassicTabLayout() {
   );
 }
 
-export default function TabLayout() {
-  if (isLiquidGlassAvailable()) {
-    return <NativeTabLayout />;
-  }
-  return <ClassicTabLayout />;
-}
+const styles = StyleSheet.create({
+  badge: {
+    position: "absolute",
+    top: -6,
+    right: -10,
+    backgroundColor: colors.primary,
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 3,
+    borderWidth: 1.5,
+    borderColor: "#FFF",
+  },
+  badgeText: {
+    color: "#FFF",
+    fontSize: 10,
+    fontWeight: "700",
+  },
+});
