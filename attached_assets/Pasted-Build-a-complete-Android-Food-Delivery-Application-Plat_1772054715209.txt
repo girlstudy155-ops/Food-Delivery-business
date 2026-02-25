@@ -1,0 +1,351 @@
+Build a complete Android Food Delivery Application.
+
+Platform: React Native with Expo
+Backend: Node.js + Express
+Database: MySQL
+Authentication: JWT
+Architecture: Clean MVC + REST API
+
+This must be a real Android mobile application (not a website).
+
+========================================================
+APP FLOW STRUCTURE (IMPORTANT)
+========================================================
+
+1️⃣ SPLASH SCREEN
+---------------------------------------
+• App Logo centered
+• Smooth animation (fade/scale)
+• After 3 seconds navigate to Auth Screen
+
+========================================================
+2️⃣ AUTH SCREEN
+========================================================
+
+Show:
+
+• Register Button
+• Login Button
+• Continue as Guest Button
+
+========================================================
+3️⃣ REGISTER SCREEN
+========================================================
+
+Fields:
+
+• Full Name (required)
+• Email (required, unique)
+• Password (required, min 6 characters, hashed using bcrypt)
+• Address / Location (required)
+• Phone Number (required)
+• Profile Picture upload (optional)
+• Remember Me checkbox
+• Register Button
+• Already have an account? Login
+
+Validation required.
+
+• Device-based Remember Me:  
+   - If user registers with Remember Me selected on a device →  
+     That device cannot register same account again.  
+
+After successful registration:
+→ Redirect to User Home Page
+
+========================================================
+4️⃣ LOGIN SCREEN
+========================================================
+
+Fields:
+• Email
+• Password
+• Remember Me checkbox
+• Login Button
+
+========================================================
+ADMIN LOGIN RULE (STRICT)
+========================================================
+
+If login credentials are:
+
+Email: admin@gmail.com
+Password: 123
+
+Then:
+→ Redirect to ADMIN PANEL (inside app)
+→ Role = admin
+
+No other email can access admin panel.
+
+On first backend run:
+• Insert default admin into database
+• Password must be hashed
+
+========================================================
+USER LOGIN RULE
+========================================================
+
+If login is NOT admin:
+→ Redirect to USER HOME PAGE
+
+========================================================
+5️⃣ CONTINUE AS GUEST
+========================================================
+
+If user clicks Continue as Guest:
+
+• Generate Guest ID automatically (Guest#XXXX)
+• Store temporarily in session
+• Not saved permanently in users table
+• Guest order history is temporary → clears when app is closed & reopened
+
+→ Redirect to USER HOME PAGE
+
+========================================================
+GLOBAL SESSION RULE
+========================================================
+
+If any new login/register/guest:
+
+• Previous cart cleared
+• Cart badge reset
+• No session data transfer
+
+========================================================
+USER HOME PAGE STRUCTURE
+========================================================
+
+=============================
+HEADER DESIGN LOGIC
+=============================
+
+IF REGISTERED USER:
+
+LEFT SIDE:
+• Profile Picture (circular)
+• Below profile pic: Address
+
+RIGHT SIDE:
+• Text: Welcome
+• Below: User Full Name
+
+IF GUEST USER:
+
+LEFT SIDE:
+• App Logo
+
+RIGHT SIDE:
+• Text: Welcome
+• Below: Guest Name (auto-generated)
+
+Cart icon always visible
+
+========================================================
+BOTTOM NAVIGATOR BAR
+========================================================
+
+Tabs:
+
+1️⃣ Home
+2️⃣ Offers
+3️⃣ Cart
+4️⃣ Order History
+
+• Registered user: order history persists, shows status (Pending, Delivered, etc.)  
+• Guest user: order history clears on app close
+
+========================================================
+HOME PAGE CONTENT (Below Header)
+========================================================
+
+1️⃣ SLIDER SECTION
+• Promotional banner slider
+• Images from database
+• Auto sliding
+
+2️⃣ HIGHLIGHTED DEALS SECTION
+• Show products where is_highlighted = true
+• Horizontal scroll
+• From database
+
+3️⃣ CATEGORIES SECTION
+• Show all categories
+• Category image + name
+• From database
+
+4️⃣ ALL PRODUCTS SECTION
+• Product card:
+   - Image (no cropping)
+   - Name
+   - Short description
+   - Price
+   - Add to Cart button
+
+========================================================
+PRODUCT DETAILS SCREEN
+========================================================
+
+When product clicked:
+
+• Image (original ratio)
+• Full Name
+• Full Description
+• Size selection: Small / Medium / Large
+• Price updates by size
+• Add to Cart button
+
+========================================================
+CART SYSTEM
+========================================================
+
+Each item:
+• Image (thumbnail)
+• Name
+• Selected size
+• Quantity selector
+• Price
+• Remove button
+
+Below:
+• Subtotal
+• Delivery Charges
+• Tax
+• Coupon Input (validated from database)
+
+========================================================
+PAYMENT RULE
+========================================================
+
+ONLY CASH ON DELIVERY allowed
+
+• Guest: must enter Address & Phone  
+• Registered: auto use saved info (editable)
+
+========================================================
+ORDER SYSTEM
+========================================================
+
+When user or guest places order:
+
+Save in orders table:
+
+- user_id (nullable)
+- guest_id (if guest)
+- name
+- phone
+- address
+- total_amount
+- payment_method (COD)
+- status
+- created_at
+
+• Registered user: order history persists  
+• Guest user: order history temporary, clears on app close
+
+========================================================
+ADMIN PANEL (INSIDE APP)
+========================================================
+
+Accessible ONLY if:
+admin@gmail.com
+password: 123
+
+========================================================
+ADMIN PANEL FEATURES
+========================================================
+
+1️⃣ Dashboard
+• Total Users
+• Total Orders
+• Total Revenue
+
+2️⃣ REGISTERED USERS MANAGEMENT
+• View all registered users
+• Show:
+   - Profile Picture
+   - Full Name
+   - Email
+   - Phone Number
+   - Address
+   - Registration Date
+• Option to Activate/Deactivate user
+
+3️⃣ Orders Management
+• View all orders
+• Clearly identify Registered User vs Guest Orders
+• Show:
+   - Name
+   - Phone
+   - Address
+   - Order items
+   - Total
+• Change status:
+   - Pending
+   - Confirmed
+   - Preparing
+   - Out for Delivery
+   - Delivered
+
+4️⃣ Product Management
+• Add/Edit/Delete product
+• Upload image
+• Set S/M/L prices
+• Assign category
+• Mark as Highlighted
+• Activate/Deactivate
+• Device-based: Product uploaded / highlighted / categorized → visible to all users even if APK shared
+
+5️⃣ Category Management
+• Add/Edit/Delete
+• Upload image
+
+6️⃣ Coupon Management
+• Name
+• Description
+• Code
+• Discount type
+• Discount value
+• Expiry date
+• Minimum order
+• Activate/Deactivate
+
+========================================================
+DATABASE STRUCTURE (MySQL)
+========================================================
+
+users
+admins
+products
+categories
+orders
+order_items
+coupons
+banners
+
+users table must include:
+• profile_image
+• address
+• phone
+• role (user/admin)
+• device_id (for Remember Me functionality)
+
+========================================================
+TECHNICAL REQUIREMENTS
+========================================================
+
+• React Native (Expo)  
+• Bottom Tab Navigator (Home / Offers / Cart / Order History)  
+• Stack Navigation  
+• JWT authentication  
+• Role-based redirection  
+• Context API or Redux  
+• Axios API calls  
+• Multer image upload  
+• Proper validation  
+• Error handling  
+• SQL schema included  
+• Default admin auto insert  
+• Must run in Replit  
+• Provide full working code  
+• No pseudo code
