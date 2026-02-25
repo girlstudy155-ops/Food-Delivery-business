@@ -162,9 +162,8 @@ export default function AdminProductsScreen() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") return;
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
+      mediaTypes: "images",
+      allowsEditing: false,
       quality: 0.8,
     });
     if (!result.canceled) setImageUri(result.assets[0].uri);

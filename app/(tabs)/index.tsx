@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Platform,
+  Alert,
 } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -297,8 +298,8 @@ const catStyles = StyleSheet.create({
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
-  const { totalItems } = useCart();
+  const { user, logout } = useAuth();
+  const { totalItems, clearCart } = useCart();
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -331,6 +332,25 @@ export default function HomeScreen() {
   const profileUri = user?.profile_image
     ? (user.profile_image.startsWith("http") ? user.profile_image : `${getApiUrl().replace(/\/$/, "")}${user.profile_image}`)
     : null;
+
+  const handleLogout = () => {
+    Alert.alert(
+      isGuest ? "End Guest Session" : "Logout",
+      isGuest ? "This will clear your session and cart. Continue?" : "Are you sure you want to logout?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: isGuest ? "End Session" : "Logout",
+          style: "destructive",
+          onPress: async () => {
+            clearCart();
+            await logout();
+            router.replace("/(auth)");
+          },
+        },
+      ]
+    );
+  };
 
   return (
     <View style={[styles.container, { paddingBottom: bottomPad }]}>
@@ -368,17 +388,24 @@ export default function HomeScreen() {
               {isGuest ? user?.full_name : user?.full_name?.split(" ")[0] || "Friend"}
             </Text>
           </View>
-          <Pressable
-            style={styles.cartButton}
-            onPress={() => router.push("/(tabs)/cart")}
-          >
-            <Ionicons name="cart-outline" size={22} color="#FFF" />
-            {totalItems > 0 && (
-              <View style={styles.cartBadge}>
-                <Text style={styles.cartBadgeText}>{totalItems}</Text>
-              </View>
+          <View style={styles.headerIcons}>
+            {!isGuest && (
+              <Pressable
+                style={styles.cartButton}
+                onPress={() => router.push("/(tabs)/cart")}
+              >
+                <Ionicons name="cart-outline" size={22} color="#FFF" />
+                {totalItems > 0 && (
+                  <View style={styles.cartBadge}>
+                    <Text style={styles.cartBadgeText}>{totalItems}</Text>
+                  </View>
+                )}
+              </Pressable>
             )}
-          </Pressable>
+            <Pressable style={styles.logoutButton} onPress={handleLogout}>
+              <Ionicons name="log-out-outline" size={22} color="#FFF" />
+            </Pressable>
+          </View>
         </View>
       </LinearGradient>
 
@@ -487,7 +514,13 @@ const styles = StyleSheet.create({
   headerLeftText: { flex: 1 },
   locationLabel: { fontSize: 11, color: "rgba(255,255,255,0.7)", fontWeight: "500" },
   locationText: { fontSize: 13, color: "#FFF", fontWeight: "600" },
-  headerRight: { flexDirection: "row", alignItems: "center", gap: 12 },
+  headerRight: { flexDirection: "row", alignItems: "center", gap: 10 },
+  headerIcons: { flexDirection: "row", alignItems: "center", gap: 8 },
+  logoutButton: {
+    width: 42, height: 42, borderRadius: 21,
+    backgroundColor: "rgba(255,255,255,0.25)",
+    alignItems: "center", justifyContent: "center",
+  },
   welcomeLabel: { fontSize: 11, color: "rgba(255,255,255,0.7)", fontWeight: "500", textAlign: "right" },
   welcomeName: { fontSize: 16, color: "#FFF", fontWeight: "700", textAlign: "right", maxWidth: 120 },
   cartButton: {
