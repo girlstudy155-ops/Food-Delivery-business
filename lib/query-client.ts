@@ -5,12 +5,16 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
  * Auto-detect backend URL for Expo / React Native / Web
  */
 export function getApiUrl(): string {
-  // Railway HTTPS backend
-  const host = "food-delivery-business-production.up.railway.app";
+  let host = "";
 
-  // Android / iOS / Web sab me HTTPS use karo
-  return `https://${host}/`;
+  if (Platform.OS === "android") {
+    host = "10.81.83.70:5000"; // Android Emulator
+  } else if (Platform.OS === "ios") {
+    host = "localhost:5000"; // iOS Simulator
+  } 
+  return `http://${host}/`;
 }
+
 /**
  * Helper: Throw error if response not ok
  */

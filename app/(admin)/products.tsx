@@ -40,7 +40,12 @@ interface Category {
 }
 
 // Fix API_HOST for all platforms
-const API_HOST = "https://food-delivery-business-production.up.railway.app/";
+const API_HOST =
+  Platform.OS === "android"
+    ? "10.81.83.70:5000"
+    : Platform.OS === "web"
+    ? "10.81.83.70:5000"
+    : "localhost:5000";
 
 const API_URL = `http://${API_HOST}/api/admin`;
 

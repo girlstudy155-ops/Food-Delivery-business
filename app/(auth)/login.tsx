@@ -28,7 +28,7 @@ export default function LoginScreen() {
   const [rememberMe, setRememberMe] = useState<boolean>(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const BASE_URL = "https://food-delivery-business-production.up.railway.app/";
+  const BASE_URL = "http://10.81.83.70:5000"; // your backend IP
 
   // ---------------- Auto-login check ----------------
   useEffect(() => {

@@ -17,7 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import colors from "@/constants/colors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const BASE_URL = "https://food-delivery-business-production.up.railway.app/";
+const BASE_URL = "http://10.81.83.70:5000/";
 
 export default function AdminCouponsScreen() {
   const insets = useSafeAreaInsets();

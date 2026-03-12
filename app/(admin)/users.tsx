@@ -21,14 +21,14 @@ import colors from "@/constants/colors";
 
 // -------------------- FETCH USERS --------------------
 async function fetchUsers() {
-  const res = await fetch("https://food-delivery-business-production.up.railway.app/api/users");
+  const res = await fetch("http://10.81.83.70:5000/api/users");
   if (!res.ok) throw new Error("Failed to fetch users");
   return res.json();
 }
 
 // -------------------- DELETE USER --------------------
 async function deleteUser(userId: number) {
-  const res = await fetch(`https://food-delivery-business-production.up.railway.app/api/users/${userId}`, {
+  const res = await fetch(`http://10.81.83.70:5000/api/users/${userId}`, {
     method: "DELETE",
   });
   if (!res.ok) throw new Error("Failed to delete user");
@@ -121,7 +121,7 @@ export default function AdminUsersScreen() {
                 } else if (user.profile_image.startsWith("file://")) {
                   imageUri = user.profile_image;
                 } else {
-                  imageUri = `https://food-delivery-business-production.up.railway.app/${user.profile_image}`;
+                  imageUri = `http://10.81.83.70:5000${user.profile_image}`;
                 }
               }
 

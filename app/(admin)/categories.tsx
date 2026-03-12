@@ -25,21 +25,27 @@ export default function AdminCategoriesScreen() {
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [categoryName, setCategoryName] = useState("");
 
   /* ================= API BASE URL ================= */
- const API_URL = "https://food-delivery-business-production.up.railway.app";
+  const getApiUrl = () => {
+    let host = "";
+    if (Platform.OS === "android") host = "10.81.83.70:5000";
+    else if (Platform.OS === "ios") host = "localhost:5000";
+    else host = "10.51.185.70:5000"; // apna PC IP
+    return `http://${host}/`;
+  };
+
   /* ================= FETCH ================= */
   const fetchCategories = async () => {
     try {
-      const res = await fetch(API_URL + "/api/admin/categories");
-      if (!res.ok) throw new Error("Failed to fetch");
+      const res = await fetch(getApiUrl() + "api/admin/categories");
       const data = await res.json();
       setCategories(data);
     } catch (error) {
-      console.log("Fetch error:", error);
       Alert.alert("Error", "Failed to fetch categories");
     } finally {
       setLoading(false);
@@ -60,8 +66,8 @@ export default function AdminCategoriesScreen() {
 
     try {
       const url = editing
-        ? `${API_URL}/api/admin/categories/${editing.id}`
-        : `${API_URL}/api/admin/categories`;
+        ? getApiUrl() + `api/admin/categories/${editing.id}`
+        : getApiUrl() + "api/admin/categories";
       const method = editing ? "PUT" : "POST";
 
       const res = await fetch(url, {
@@ -81,8 +87,7 @@ export default function AdminCategoriesScreen() {
       );
       closeModal();
       fetchCategories();
-    } catch (error) {
-      console.log("Save error:", error);
+    } catch {
       Alert.alert("Error", editing ? "Update failed" : "Create failed");
     }
   };
@@ -90,12 +95,12 @@ export default function AdminCategoriesScreen() {
   /* ================= DELETE ================= */
   const deleteCategory = async (id: number) => {
     try {
-      const res = await fetch(`${API_URL}/api/admin/categories/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Delete failed");
+      await fetch(getApiUrl() + `api/admin/categories/${id}`, {
+        method: "DELETE",
+      });
       Alert.alert("Deleted", "Category removed");
       fetchCategories();
-    } catch (error) {
-      console.log("Delete error:", error);
+    } catch {
       Alert.alert("Error", "Failed to delete category");
     }
   };
@@ -125,7 +130,10 @@ export default function AdminCategoriesScreen() {
         colors={["#1E293B", "#334155"]}
         style={[styles.header, { paddingTop: topPad + 12 }]}
       >
-        <Pressable style={styles.backBtn} onPress={() => router.back()}>
+        <Pressable
+          style={styles.backBtn}
+          onPress={() => router.back()}
+        >
           <Ionicons name="arrow-back" size={24} color="#FFF" />
         </Pressable>
 
@@ -166,7 +174,11 @@ export default function AdminCategoriesScreen() {
                     onPress={() =>
                       Alert.alert("Delete?", `Delete "${cat.name}"?`, [
                         { text: "Cancel", style: "cancel" },
-                        { text: "Delete", style: "destructive", onPress: () => deleteCategory(cat.id) },
+                        {
+                          text: "Delete",
+                          style: "destructive",
+                          onPress: () => deleteCategory(cat.id),
+                        },
                       ])
                     }
                     style={styles.iconBtn}
@@ -183,7 +195,10 @@ export default function AdminCategoriesScreen() {
       {/* Modal */}
       <Modal visible={modal} transparent animationType="slide">
         <Pressable style={styles.modalOverlay} onPress={closeModal}>
-          <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+          <Pressable
+            style={styles.modalContent}
+            onPress={(e) => e.stopPropagation()}
+          >
             <Text style={styles.modalTitle}>
               {editing ? "Edit Category" : "Add Category"}
             </Text>
@@ -202,7 +217,9 @@ export default function AdminCategoriesScreen() {
               </Pressable>
 
               <Pressable style={styles.saveBtn} onPress={saveCategory}>
-                <Text style={styles.saveBtnText}>{editing ? "Update" : "Add"}</Text>
+                <Text style={styles.saveBtnText}>
+                  {editing ? "Update" : "Add"}
+                </Text>
               </Pressable>
             </View>
           </Pressable>
@@ -222,6 +239,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
+   headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end" },
   backBtn: { marginBottom: 8, width: 36, height: 36, alignItems: "center", justifyContent: "center" },
   headerTitle: { fontSize: 24, fontWeight: "800", color: "#FFF" },
   addBtn: {
