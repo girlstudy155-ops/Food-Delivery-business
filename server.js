@@ -135,6 +135,78 @@ app.get("/api/categories", (_req, res) => {
   const active = categories.filter((c) => c.is_active !== false);
   res.json(active);
 });
+// -------------------- CATEGORY --------------------
+
+app.get("/api/admin/categories", (_req, res) => {
+  res.json(categories);
+});
+
+app.post("/api/admin/categories", (req, res) => {
+  const { name, is_active } = req.body;
+
+  if (!name) {
+    return res.status(400).json({ message: "Name required" });
+  }
+
+  const id =
+    categories.length > 0
+      ? categories[categories.length - 1].id + 1
+      : 1;
+
+  const newCategory = {
+    id,
+    name: name.trim(),
+    is_active: is_active !== undefined ? Boolean(is_active) : true,
+  };
+
+  categories.push(newCategory);
+
+  saveData(categoriesFile, categories);
+
+  res.json(newCategory);
+});
+
+app.put("/api/admin/categories/:id", (req, res) => {
+
+  const id = Number(req.params.id);
+  const { name } = req.body;
+
+  const category = categories.find((c) => c.id === id);
+
+  if (!category) {
+    return res.status(404).json({ message: "Category not found" });
+  }
+
+  category.name = name.trim();
+
+  saveData(categoriesFile, categories);
+
+  res.json(category);
+
+});
+
+app.delete("/api/admin/categories/:id", (req, res) => {
+
+  const id = Number(req.params.id);
+
+  const index = categories.findIndex((c) => c.id === id);
+
+  if (index === -1) {
+    return res.status(404).json({ message: "Category not found" });
+  }
+
+  categories.splice(index, 1);
+
+  saveData(categoriesFile, categories);
+
+  res.json({ message: "Category deleted" });
+
+});
+
+app.get("/api/categories", (_req, res) => {
+  const active = categories.filter((c) => c.is_active !== false);
+  res.json(active);
+});
 
 // -------------------- PRODUCTS --------------------
 
@@ -689,7 +761,7 @@ app.patch("/api/users/:id/status", (req, res) => {
 });
 // -------------------- START SERVER --------------------
 
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
   console.log(`Backend running on port ${PORT}`);
