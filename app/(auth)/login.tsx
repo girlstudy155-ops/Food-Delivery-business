@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -9,27 +9,49 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Alert,
+  Switch,
 } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import colors from "@/constants/colors";
-import { useAuth } from "@/contexts/auth";
-import { useCart } from "@/contexts/cart";
 import * as Haptics from "expo-haptics";
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
-  const { login, user } = useAuth();
-  const { clearCart } = useCart();
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [email, setEmail] = useState<string>("");
+  const [password, setPassword] = useState<string>("");
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [rememberMe, setRememberMe] = useState<boolean>(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  const BASE_URL = "https://food-delivery-business-production.up.railway.app/";
+
+  // ---------------- Auto-login check ----------------
+  useEffect(() => {
+    const checkRememberedUser = async () => {
+      try {
+        const user = await AsyncStorage.getItem("rememberUser");
+        if (user) {
+          const parsedUser = JSON.parse(user);
+          // Only redirect if valid role
+          if (parsedUser.role === "admin") {
+            router.replace("/(admin)");
+          } else if (parsedUser.role === "user") {
+            router.replace("/(tabs)");
+          }
+        }
+      } catch (err) {
+        console.log("Error reading remembered user:", err);
+      }
+    };
+    checkRememberedUser();
+  }, []);
+
+  // ---------------- Form validation ----------------
   const validate = () => {
     const e: Record<string, string> = {};
     if (!email.trim()) e.email = "Email is required";
@@ -39,30 +61,65 @@ export default function LoginScreen() {
     return Object.keys(e).length === 0;
   };
 
+  // ---------------- Login ----------------
   const handleLogin = async () => {
     if (!validate()) return;
+
     setIsLoading(true);
+
     try {
-      clearCart();
-      await login(email.trim().toLowerCase(), password);
+      // Admin login
+      if (email.toLowerCase() === "admin@gmail.com" && password === "123") {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+        if (rememberMe) {
+          await AsyncStorage.setItem(
+            "rememberUser",
+            JSON.stringify({ email: "admin@gmail.com", role: "admin" })
+          );
+        } else {
+          await AsyncStorage.removeItem("rememberUser"); // clear if unchecked
+        }
+
+        router.replace("/(admin)");
+        return;
+      }
+
+      // Normal user login
+      const res = await fetch(`${BASE_URL}/api/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setErrors({ general: data.message || "Login failed" });
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        return;
+      }
+
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      if (rememberMe) {
+        await AsyncStorage.setItem(
+          "rememberUser",
+          JSON.stringify({ ...data.user, role: "user" })
+        );
+      } else {
+        await AsyncStorage.removeItem("rememberUser");
+      }
+
+      router.replace("/(tabs)");
     } catch (err: any) {
+      console.log("LOGIN ERROR:", err);
+      setErrors({ general: "Network or backend error" });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      setErrors({ general: err.message || "Login failed" });
+    } finally {
       setIsLoading(false);
     }
   };
-
-  // Navigate when user state changes after login
-  React.useEffect(() => {
-    if (user) {
-      if (user.role === "admin") {
-        router.replace("/(admin)");
-      } else {
-        router.replace("/(tabs)");
-      }
-    }
-  }, [user]);
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
@@ -74,15 +131,16 @@ export default function LoginScreen() {
     >
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={[styles.container, { paddingTop: topPad + 16 }]}
+        contentContainerStyle={[styles.container, { paddingTop: topPad + 32 }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
+        {/* Back Button */}
         <Pressable style={styles.backButton} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </Pressable>
 
+        {/* Header */}
         <View style={styles.header}>
           <View style={styles.iconBadge}>
             <Ionicons name="flame" size={32} color={colors.primary} />
@@ -91,18 +149,25 @@ export default function LoginScreen() {
           <Text style={styles.subtitle}>Sign in to continue ordering</Text>
         </View>
 
-        {errors.general ? (
+        {/* General Error */}
+        {errors.general && (
           <View style={styles.errorBanner}>
             <Ionicons name="alert-circle" size={16} color={colors.error} />
             <Text style={styles.errorBannerText}>{errors.general}</Text>
           </View>
-        ) : null}
+        )}
 
+        {/* Form */}
         <View style={styles.form}>
+          {/* Email */}
           <View style={styles.fieldGroup}>
             <Text style={styles.label}>Email</Text>
             <View style={[styles.inputRow, errors.email && styles.inputError]}>
-              <Ionicons name="mail-outline" size={20} color={errors.email ? colors.error : colors.textLight} />
+              <Ionicons
+                name="mail-outline"
+                size={20}
+                color={errors.email ? colors.error : colors.textLight}
+              />
               <TextInput
                 style={styles.input}
                 placeholder="you@example.com"
@@ -111,18 +176,22 @@ export default function LoginScreen() {
                 onChangeText={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
-                autoCorrect={false}
               />
             </View>
             {errors.email && <Text style={styles.fieldError}>{errors.email}</Text>}
           </View>
 
+          {/* Password */}
           <View style={styles.fieldGroup}>
             <Text style={styles.label}>Password</Text>
             <View style={[styles.inputRow, errors.password && styles.inputError]}>
-              <Ionicons name="lock-closed-outline" size={20} color={errors.password ? colors.error : colors.textLight} />
+              <Ionicons
+                name="lock-closed-outline"
+                size={20}
+                color={errors.password ? colors.error : colors.textLight}
+              />
               <TextInput
-                style={[styles.input, { flex: 1 }]}
+                style={styles.input}
                 placeholder="Your password"
                 placeholderTextColor={colors.textLight}
                 value={password}
@@ -130,12 +199,28 @@ export default function LoginScreen() {
                 secureTextEntry={!showPassword}
               />
               <Pressable onPress={() => setShowPassword(!showPassword)} hitSlop={8}>
-                <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={20} color={colors.textLight} />
+                <Ionicons
+                  name={showPassword ? "eye-off-outline" : "eye-outline"}
+                  size={20}
+                  color={colors.textLight}
+                />
               </Pressable>
             </View>
             {errors.password && <Text style={styles.fieldError}>{errors.password}</Text>}
           </View>
 
+          {/* Remember Me */}
+          <View style={styles.rememberMeRow}>
+            <Switch
+              value={rememberMe}
+              onValueChange={setRememberMe}
+              trackColor={{ true: colors.primary, false: colors.surface }}
+              thumbColor={rememberMe ? colors.primary : "#fff"}
+            />
+            <Text style={styles.rememberMeText}>Remember Me</Text>
+          </View>
+
+          {/* Login Button */}
           <Pressable
             style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
             onPress={handleLogin}
@@ -152,43 +237,32 @@ export default function LoginScreen() {
           </Pressable>
         </View>
 
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>Don't have an account? </Text>
-          <Pressable onPress={() => router.replace("/(auth)/register")}>
-            <Text style={styles.footerLink}>Create one</Text>
-          </Pressable>
-        </View>
-
-        <View style={styles.adminHint}>
-          <Ionicons name="shield-checkmark-outline" size={14} color={colors.textLight} />
-          <Text style={styles.adminHintText}>Admin: admin@gmail.com / 123</Text>
-        </View>
+        {/* Register Link */}
+        <Pressable
+          style={styles.registerLinkContainer}
+          onPress={() => router.push("/register")}
+        >
+          <Text style={styles.registerLinkText}>
+            Don't have an account? Please Register
+          </Text>
+        </Pressable>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingBottom: 40,
-  },
+  container: { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 40 },
   backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 24,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 4,
+    marginBottom: 16,
   },
-  header: { marginBottom: 32 },
+  header: { marginBottom: 24, alignItems: "center" },
   iconBadge: {
     width: 64,
     height: 64,
@@ -196,10 +270,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primaryPale,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 16,
+    marginBottom: 12,
   },
-  title: { fontSize: 30, fontWeight: "800", color: colors.text, marginBottom: 6 },
-  subtitle: { fontSize: 15, color: colors.textSecondary },
+  title: { fontSize: 28, fontWeight: "800", color: colors.text, marginBottom: 4 },
+  subtitle: { fontSize: 14, color: colors.textSecondary },
   errorBanner: {
     flexDirection: "row",
     alignItems: "center",
@@ -225,11 +299,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   inputError: { borderColor: colors.error },
-  input: {
-    flex: 1,
-    fontSize: 15,
-    color: colors.text,
-  },
+  input: { flex: 1, fontSize: 15, color: colors.text },
   fieldError: { fontSize: 12, color: colors.error, marginTop: 2 },
   loginButton: {
     backgroundColor: colors.primary,
@@ -240,27 +310,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 8,
     marginTop: 8,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 14,
-    elevation: 10,
   },
   loginButtonDisabled: { opacity: 0.7 },
   loginButtonText: { color: "#FFF", fontSize: 17, fontWeight: "700" },
-  footer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    marginTop: 28,
-  },
-  footerText: { fontSize: 15, color: colors.textSecondary },
-  footerLink: { fontSize: 15, color: colors.primary, fontWeight: "700" },
-  adminHint: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginTop: 16,
-    justifyContent: "center",
-  },
-  adminHintText: { fontSize: 12, color: colors.textLight },
-});
+  rememberMeRow: { flexDirection: "row", alignItems: "center", gap: 8, marginVertical: 8 },
+  rememberMeText: { color: colors.text, fontSize: 14 },
+  registerLinkContainer: { marginTop: 16, alignItems: "center" },
+  registerLinkText: { color: colors.primary, fontSize: 14, fontWeight: "600", textDecorationLine: "underline" },
+}); 

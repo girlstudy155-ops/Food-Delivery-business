@@ -1,0 +1,236 @@
+[
+  {
+    "id": 1,
+    "created_at": "2026-03-07T19:53:05.146Z",
+    "status": "Out for Delivery",
+    "customer": {
+      "name": "NN",
+      "phone": "979779",
+      "address": "Nznz",
+      "notes": "Sbsn"
+    },
+    "coupon_code": null,
+    "subtotal": 13,
+    "discount": 0,
+    "tax": 0.65,
+    "delivery": 2.99,
+    "total_amount": 16.64,
+    "items": [
+      {
+        "product_id": 1,
+        "product_name": "Najaj",
+        "size": "Medium",
+        "quantity": 1,
+        "price": 13
+      }
+    ]
+  },
+  {
+    "id": 2,
+    "created_at": "2026-03-07T20:19:49.836Z",
+    "status": "Pending",
+    "customer": {
+      "name": "Nsnsn",
+      "phone": "9797",
+      "address": "Nznzzb",
+      "notes": "Nznz"
+    },
+    "coupon_code": null,
+    "subtotal": 13,
+    "discount": 0,
+    "tax": 0.65,
+    "delivery": 2.99,
+    "total_amount": 16.64,
+    "items": [
+      {
+        "product_id": 2,
+        "product_name": "Nsnssbsnx",
+        "size": "Medium",
+        "quantity": 1,
+        "price": 13
+      }
+    ]
+  },
+  {
+    "id": 3,
+    "created_at": "2026-03-07T20:54:03.281Z",
+    "status": "Out for Delivery",
+    "customer": {
+      "name": "Nzznzn",
+      "phone": "6494",
+      "address": "Sjjs",
+      "notes": "Nssn"
+    },
+    "coupon_code": null,
+    "subtotal": 13,
+    "discount": 0,
+    "tax": 0.65,
+    "delivery": 2.99,
+    "total_amount": 16.64,
+    "items": [
+      {
+        "product_id": 2,
+        "product_name": "Nsnssbsnx",
+        "size": "Medium",
+        "quantity": 1,
+        "price": 13
+      }
+    ]
+  },
+  {
+    "id": 4,
+    "created_at": "2026-03-07T21:01:05.236Z",
+    "status": "pending",
+    "customer": {
+      "name": "Maheen",
+      "phone": "949494",
+      "address": "Baab",
+      "notes": "Bzb"
+    },
+    "coupon_code": null,
+    "subtotal": 13,
+    "discount": 0,
+    "tax": 0.65,
+    "delivery": 2.99,
+    "total_amount": 16.64,
+    "items": [
+      {
+        "product_id": 2,
+        "product_name": "Nsnssbsnx",
+        "size": "Medium",
+        "quantity": 1,
+        "price": 13
+      }
+    ]
+  },
+  {
+    "id": 5,
+    "created_at": "2026-03-07T21:15:25.681Z",
+    "status": "Preparing",
+    "customer": {
+      "name": "Sara khan",
+      "phone": "977949",
+      "address": "Nnzjs",
+      "notes": ""
+    },
+    "coupon_code": null,
+    "subtotal": 13,
+    "discount": 0,
+    "tax": 0.65,
+    "delivery": 2.99,
+    "total_amount": 16.64,
+    "items": [
+      {
+        "product_id": 2,
+        "product_name": "Nsnssbsnx",
+        "size": "Medium",
+        "quantity": 1,
+        "price": 13
+      }
+    ]
+  },
+  {
+    "id": 6,
+    "created_at": "2026-03-07T21:19:53.000Z",
+    "status": "Pending",
+    "customer": {
+      "name": "Bzzb",
+      "phone": "9779",
+      "address": "Bzbz",
+      "notes": ""
+    },
+    "coupon_code": null,
+    "subtotal": 13,
+    "discount": 0,
+    "tax": 0.65,
+    "delivery": 2.99,
+    "total_amount": 16.64,
+    "items": [
+      {
+        "product_id": 2,
+        "product_name": "Nsnssbsnx",
+        "size": "Medium",
+        "quantity": 1,
+        "price": 13
+      }
+    ]
+  },
+  {
+    "id": 7,
+    "created_at": "2026-03-08T19:05:40.261Z",
+    "status": "Confirmed",
+    "customer": {
+      "name": ",n",
+      "phone": "9889",
+      "address": "Nznz",
+      "notes": "Nzzn"
+    },
+    "coupon_code": null,
+    "subtotal": 13,
+    "discount": 0,
+    "tax": 0.65,
+    "delivery": 2.99,
+    "total_amount": 16.64,
+    "items": [
+      {
+        "product_id": 2,
+        "product_name": "Nsnssbsnx",
+        "size": "Medium",
+        "quantity": 1,
+        "price": 13
+      }
+    ]
+  },
+  {
+    "id": 8,
+    "created_at": "2026-03-08T20:15:06.069Z",
+    "status": "Confirmed",
+    "customer": {
+      "name": "Jzjz",
+      "phone": "9779",
+      "address": "Nznz",
+      "notes": "Nzzn"
+    },
+    "coupon_code": null,
+    "subtotal": 13,
+    "discount": 0,
+    "tax": 0.65,
+    "delivery": 2.99,
+    "total_amount": 16.64,
+    "items": [
+      {
+        "product_id": 2,
+        "product_name": "Nsnssbsnx",
+        "size": "Medium",
+        "quantity": 1,
+        "price": 13
+      }
+    ]
+  },
+  {
+    "id": 9,
+    "created_at": "2026-03-08T20:52:36.359Z",
+    "status": "Confirmed",
+    "customer": {
+      "name": "Nzzjzh",
+      "phone": "9797",
+      "address": "BB",
+      "notes": "BB"
+    },
+    "coupon_code": "SJ2",
+    "subtotal": 13,
+    "discount": 5.07,
+    "tax": 0.3965,
+    "delivery": 2.99,
+    "total_amount": 11.3165,
+    "items": [
+      {
+        "product_id": 2,
+        "product_name": "Nsnssbsnx",
+        "size": "Medium",
+        "quantity": 1,
+        "price": 13
+      }
+    ]
+  }
+]

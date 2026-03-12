@@ -15,18 +15,30 @@ import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
-import { fetch } from "expo/fetch";
 import * as Haptics from "expo-haptics";
 import colors from "@/constants/colors";
 import { useCart, CartItem } from "@/contexts/cart";
-import { getApiUrl } from "@/lib/query-client";
 
-const DELIVERY_CHARGE = 2.99;
-const TAX_RATE = 0.08;
+const DELIVERY_CHARGE = 450;
+const TAX_RATE = 0.08; // 8% tax
 
+const API_BASE_URL = "http://10.81.83.70:5000/";
+
+// ---------------- SAFE NUMBER FUNCTION ----------------
+const safeNumber = (value: any) => {
+  const num = Number(value);
+  return isNaN(num) ? 0 : num;
+};
+
+// ---------------- Cart Item Card ----------------
 function CartItemCard({ item }: { item: CartItem }) {
   const { updateQuantity, removeItem } = useCart();
-  const imageUri = item.image?.startsWith("http") ? item.image : item.image ? `${getApiUrl().replace(/\/$/, "")}${item.image}` : null;
+
+  const imageUri = item.image?.startsWith("http")
+    ? item.image
+    : item.image
+    ? `${API_BASE_URL.replace(/\/$/, "")}${item.image}`
+    : null;
 
   return (
     <View style={styles.cartItem}>
@@ -37,22 +49,39 @@ function CartItemCard({ item }: { item: CartItem }) {
           <Ionicons name="restaurant" size={24} color={colors.textLight} />
         </View>
       )}
+
       <View style={styles.itemContent}>
         <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
         <Text style={styles.itemSize}>{item.size}</Text>
-        <Text style={styles.itemPrice}>${(item.price * item.quantity).toFixed(2)}</Text>
+        <Text style={styles.itemPrice}>
+          ₹{(safeNumber(item.price) * safeNumber(item.quantity)).toFixed(2)}
+        </Text>
       </View>
+
       <View style={styles.quantityControl}>
         <Pressable
           style={styles.qtyButton}
-          onPress={() => { Haptics.selectionAsync(); updateQuantity(item.product_id, item.size, item.quantity - 1); }}
+          onPress={() => {
+            Haptics.selectionAsync();
+            if (item.quantity === 1) removeItem(item.product_id, item.size);
+            else updateQuantity(item.product_id, item.size, item.quantity - 1);
+          }}
         >
-          <Ionicons name={item.quantity === 1 ? "trash-outline" : "remove"} size={16} color={item.quantity === 1 ? colors.error : colors.text} />
+          <Ionicons
+            name={item.quantity === 1 ? "trash-outline" : "remove"}
+            size={16}
+            color={item.quantity === 1 ? colors.error : colors.text}
+          />
         </Pressable>
+
         <Text style={styles.qty}>{item.quantity}</Text>
+
         <Pressable
           style={styles.qtyButton}
-          onPress={() => { Haptics.selectionAsync(); updateQuantity(item.product_id, item.size, item.quantity + 1); }}
+          onPress={() => {
+            Haptics.selectionAsync();
+            updateQuantity(item.product_id, item.size, item.quantity + 1);
+          }}
         >
           <Ionicons name="add" size={16} color={colors.primary} />
         </Pressable>
@@ -61,9 +90,12 @@ function CartItemCard({ item }: { item: CartItem }) {
   );
 }
 
+// ---------------- Cart Screen ----------------
 export default function CartScreen() {
+
   const insets = useSafeAreaInsets();
   const { items, subtotal, clearCart } = useCart();
+
   const [couponCode, setCouponCode] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
   const [couponLoading, setCouponLoading] = useState(false);
@@ -71,35 +103,77 @@ export default function CartScreen() {
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
-  const discount = appliedCoupon
-    ? appliedCoupon.discount_type === "percentage"
-      ? subtotal * (parseFloat(appliedCoupon.discount_value) / 100)
-      : parseFloat(appliedCoupon.discount_value)
-    : 0;
+  // ---------------- SAFE CALCULATIONS ----------------
+  const safeSubtotal = safeNumber(subtotal);
 
-  const tax = (subtotal - discount) * TAX_RATE;
-  const total = subtotal - discount + (items.length > 0 ? DELIVERY_CHARGE : 0) + tax;
+  let discount = 0;
 
+if (appliedCoupon) {
+
+  const discountValue = safeNumber(
+    appliedCoupon.discount_value || appliedCoupon.discount
+  );
+
+  if (appliedCoupon.discount_type === "percentage") {
+    discount = safeSubtotal * (discountValue / 100);
+  } else {
+    discount = discountValue;
+  }
+
+}
+
+  const discountedSubtotal = Math.max(0, safeSubtotal - discount);
+
+  const tax = discountedSubtotal * TAX_RATE;
+
+  const total =
+    discountedSubtotal +
+    (items.length > 0 ? DELIVERY_CHARGE : 0) +
+    tax;
+
+  // ---------------- Apply Coupon ----------------
   const applyCoupon = async () => {
+
     if (!couponCode.trim()) return;
+
     setCouponLoading(true);
     setCouponError("");
+
     try {
-      const base = getApiUrl();
-      const res = await fetch(`${base}api/coupons/validate`, {
+
+      const res = await fetch(`${API_BASE_URL}api/coupons/validate`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: couponCode.trim().toUpperCase(), subtotal }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          code: couponCode.trim().toUpperCase(),
+          subtotal: safeSubtotal,
+        }),
       });
+
       const data = await res.json();
+
       if (!res.ok) throw new Error(data.message || "Invalid coupon");
+
       setAppliedCoupon(data);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      Haptics.notificationAsync(
+        Haptics.NotificationFeedbackType.Success
+      );
+
     } catch (err: any) {
+
       setCouponError(err.message || "Invalid coupon");
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+
+      Haptics.notificationAsync(
+        Haptics.NotificationFeedbackType.Error
+      );
+
     } finally {
+
       setCouponLoading(false);
+
     }
   };
 
@@ -109,32 +183,53 @@ export default function CartScreen() {
     setCouponError("");
   };
 
+  // ---------------- EMPTY CART ----------------
   if (items.length === 0) {
     return (
       <View style={[styles.emptyContainer, { paddingTop: topPad }]}>
         <LinearGradient colors={["#FF4500", "#FF6B35"]} style={[styles.header, { paddingTop: 12 }]}>
           <Text style={styles.headerTitle}>My Cart</Text>
         </LinearGradient>
+
         <View style={styles.emptyState}>
           <View style={styles.emptyIconContainer}>
             <Ionicons name="cart-outline" size={64} color={colors.textLight} />
           </View>
+
           <Text style={styles.emptyTitle}>Your cart is empty</Text>
-          <Text style={styles.emptySubtitle}>Add some delicious items to get started</Text>
-          <Pressable style={styles.browseButton} onPress={() => router.push("/(tabs)")}>
+
+          <Text style={styles.emptySubtitle}>
+            Add some delicious items to get started
+          </Text>
+
+          <Pressable
+            style={styles.browseButton}
+            onPress={() => router.push("/(tabs)")}
+          >
             <Ionicons name="restaurant-outline" size={18} color="#FFF" />
             <Text style={styles.browseButtonText}>Browse Menu</Text>
           </Pressable>
+
         </View>
       </View>
     );
   }
 
+  // ---------------- MAIN UI ----------------
   return (
     <View style={[styles.container, { paddingTop: topPad }]}>
-      <LinearGradient colors={["#FF4500", "#FF6B35"]} style={[styles.header, { paddingTop: 12 }]}>
+
+      <LinearGradient
+        colors={["#FF4500", "#FF6B35"]}
+        style={[styles.header, { paddingTop: 12 }]}
+      >
+
         <Text style={styles.headerTitle}>My Cart</Text>
-        <Text style={styles.headerSubtitle}>{items.length} {items.length === 1 ? "item" : "items"}</Text>
+
+        <Text style={styles.headerSubtitle}>
+          {items.length} {items.length === 1 ? "item" : "items"}
+        </Text>
+
         <Pressable
           style={styles.clearButton}
           onPress={() => {
@@ -146,6 +241,7 @@ export default function CartScreen() {
         >
           <Ionicons name="trash-outline" size={18} color="rgba(255,255,255,0.85)" />
         </Pressable>
+
       </LinearGradient>
 
       <ScrollView
@@ -153,27 +249,39 @@ export default function CartScreen() {
         showsVerticalScrollIndicator={false}
         contentInsetAdjustmentBehavior="automatic"
       >
-        {/* Items */}
+
         <View style={styles.itemsSection}>
           {items.map((item) => (
-            <CartItemCard key={`${item.product_id}-${item.size}`} item={item} />
+            <CartItemCard
+              key={`${item.product_id}-${item.size}`}
+              item={item}
+            />
           ))}
         </View>
 
-        {/* Coupon */}
+        {/* Coupon Section */}
         <View style={styles.card}>
+
           <Text style={styles.cardTitle}>Coupon Code</Text>
+
           {appliedCoupon ? (
+
             <View style={styles.appliedCoupon}>
               <Ionicons name="checkmark-circle" size={20} color={colors.success} />
-              <Text style={styles.appliedCouponText}>{appliedCoupon.code} applied!</Text>
+              <Text style={styles.appliedCouponText}>
+                {appliedCoupon.code} applied!
+              </Text>
               <Pressable onPress={removeCoupon}>
                 <Ionicons name="close-circle" size={20} color={colors.error} />
               </Pressable>
             </View>
+
           ) : (
+
             <View>
+
               <View style={styles.couponInput}>
+
                 <TextInput
                   style={styles.couponTextField}
                   placeholder="Enter coupon code"
@@ -182,78 +290,126 @@ export default function CartScreen() {
                   onChangeText={setCouponCode}
                   autoCapitalize="characters"
                 />
+
                 <Pressable
                   style={[styles.couponApply, couponLoading && { opacity: 0.7 }]}
                   onPress={applyCoupon}
                   disabled={couponLoading}
                 >
+
                   {couponLoading ? (
                     <ActivityIndicator size="small" color="#FFF" />
                   ) : (
                     <Text style={styles.couponApplyText}>Apply</Text>
                   )}
+
                 </Pressable>
+
               </View>
+
               {couponError ? (
                 <Text style={styles.couponError}>{couponError}</Text>
               ) : null}
-              <Text style={styles.couponHint}>Try: WELCOME20, SAVE5, WEEKEND15</Text>
+
             </View>
+
           )}
+
         </View>
 
-        {/* Summary */}
+        {/* Order Summary */}
         <View style={styles.card}>
+
           <Text style={styles.cardTitle}>Order Summary</Text>
+
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Subtotal</Text>
-            <Text style={styles.summaryValue}>${subtotal.toFixed(2)}</Text>
+            <Text style={styles.summaryValue}>
+              ₹{safeSubtotal.toFixed(2)}
+            </Text>
           </View>
+
           {discount > 0 && (
             <View style={styles.summaryRow}>
-              <Text style={[styles.summaryLabel, { color: colors.success }]}>Discount</Text>
-              <Text style={[styles.summaryValue, { color: colors.success }]}>-${discount.toFixed(2)}</Text>
+              <Text style={[styles.summaryLabel, { color: colors.success }]}>
+                Discount
+              </Text>
+              <Text style={[styles.summaryValue, { color: colors.success }]}>
+                -₹{discount.toFixed(2)}
+              </Text>
             </View>
           )}
+
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Delivery Charge</Text>
-            <Text style={styles.summaryValue}>${DELIVERY_CHARGE.toFixed(2)}</Text>
+            <Text style={styles.summaryValue}>
+              ₹{DELIVERY_CHARGE.toFixed(2)}
+            </Text>
           </View>
+
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Tax (8%)</Text>
-            <Text style={styles.summaryValue}>${tax.toFixed(2)}</Text>
+            <Text style={styles.summaryValue}>
+              ₹{tax.toFixed(2)}
+            </Text>
           </View>
+
           <View style={[styles.summaryRow, styles.totalRow]}>
             <Text style={styles.totalLabel}>Total</Text>
-            <Text style={styles.totalValue}>${total.toFixed(2)}</Text>
+            <Text style={styles.totalValue}>
+              ₹{total.toFixed(2)}
+            </Text>
           </View>
+
         </View>
 
         <View style={{ height: 120 }} />
+
       </ScrollView>
 
       {/* Checkout Button */}
-      <View style={[styles.checkoutContainer, { paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 90 }]}>
+      <View style={[
+        styles.checkoutContainer,
+        { paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 90 }
+      ]}>
+
         <Pressable
           style={styles.checkoutButton}
-          onPress={() => router.push({ pathname: "/checkout", params: {
-            coupon_code: appliedCoupon?.code || "",
-            total: total.toFixed(2),
-            subtotal: subtotal.toFixed(2),
-            discount: discount.toFixed(2),
-            tax: tax.toFixed(2),
-          }})}
+          onPress={() =>
+            router.push({
+              pathname: "/checkout",
+              params: {
+                coupon_code: appliedCoupon?.code || "",
+                total: total.toFixed(2),
+                subtotal: safeSubtotal.toFixed(2),
+                discount: discount.toFixed(2),
+                tax: tax.toFixed(2),
+              },
+            })
+          }
         >
-          <Text style={styles.checkoutButtonText}>Place Order</Text>
+
+          <Text style={styles.checkoutButtonText}>
+            Place Order
+          </Text>
+
           <View style={styles.checkoutTotal}>
-            <Text style={styles.checkoutTotalText}>${total.toFixed(2)}</Text>
+            <Text style={styles.checkoutTotalText}>
+              ${total.toFixed(2)}
+            </Text>
           </View>
+
         </Pressable>
+
       </View>
+
     </View>
   );
 }
 
+// ---------------- STYLES ----------------
+// keep your existing styles unchanged
+// ---------------- STYLES (unchanged from your current code) ----------------
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   emptyContainer: { flex: 1, backgroundColor: colors.background },
@@ -267,12 +423,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: 24, fontWeight: "800", color: "#FFF" },
   headerSubtitle: { fontSize: 14, color: "rgba(255,255,255,0.8)", flex: 1 },
-  clearButton: {
-    position: "absolute",
-    right: 20,
-    bottom: 16,
-    padding: 6,
-  },
+  clearButton: { position: "absolute", right: 20, bottom: 16, padding: 6 },
   scroll: { flex: 1 },
   itemsSection: { paddingHorizontal: 16, paddingTop: 16, gap: 10 },
   cartItem: {
@@ -345,7 +496,6 @@ const styles = StyleSheet.create({
   },
   couponApplyText: { color: "#FFF", fontSize: 14, fontWeight: "700" },
   couponError: { color: colors.error, fontSize: 12, marginTop: 6 },
-  couponHint: { color: colors.textLight, fontSize: 11, marginTop: 6 },
   summaryRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 8 },
   summaryLabel: { fontSize: 14, color: colors.textSecondary },
   summaryValue: { fontSize: 14, color: colors.text, fontWeight: "600" },

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -11,57 +11,103 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
-import { useQuery } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
-import { fetch } from "expo/fetch";
 import * as Haptics from "expo-haptics";
 import colors from "@/constants/colors";
 import { useCart } from "@/contexts/cart";
-import { getApiUrl } from "@/lib/query-client";
 
-const { width, height } = Dimensions.get("window");
+const { height } = Dimensions.get("window");
 
 type SizeKey = "Small" | "Medium" | "Large";
 
-async function fetchProduct(id: string) {
-  const base = getApiUrl();
-  const res = await fetch(`${base}api/products/${id}`);
-  if (!res.ok) throw new Error("Product not found");
-  return res.json();
+interface Product {
+  id: number;
+  name: string;
+  description?: string;
+  category_name?: string;
+  price_small: number;
+  price_medium: number;
+  price_large: number;
+  is_highlighted: boolean;
+  image?: string;
 }
+
+/* ================= API HOST ================= */
+
+const API_HOST =
+  Platform.OS === "android"
+    ? "10.81.83.70:5000"
+    : Platform.OS === "web"
+    ? "10.81.83.70:5000"
+    : "localhost:5000";
+
+const API_URL = `http://${API_HOST}/api`;
+
+/* ================= SCREEN ================= */
 
 export default function ProductDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const { addItem } = useCart();
 
+  const [product, setProduct] = useState<Product | null>(null);
+  const [loading, setLoading] = useState(true);
+
   const [selectedSize, setSelectedSize] = useState<SizeKey>("Medium");
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
 
-  const { data: product, isLoading, error } = useQuery({
-    queryKey: ["product", id],
-    queryFn: () => fetchProduct(id!),
-    enabled: !!id,
-  });
-
   const sizes: SizeKey[] = ["Small", "Medium", "Large"];
 
-  const priceMap: Record<SizeKey, string> = product
-    ? {
-        Small: product.price_small,
-        Medium: product.price_medium,
-        Large: product.price_large,
-      }
-    : { Small: "0", Medium: "0", Large: "0" };
+  /* ================= FETCH PRODUCT ================= */
 
-  const selectedPrice = parseFloat(priceMap[selectedSize] || "0");
+  const fetchProduct = async () => {
+    try {
+      const res = await fetch(`${API_URL}/products/${id}`);
+      if (!res.ok) throw new Error("Product not found");
+
+      const data = await res.json();
+      setProduct(data);
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProduct();
+  }, []);
+
+  /* ================= PRICE MAP ================= */
+
+  const priceMap: Record<SizeKey, number> = product
+    ? {
+        Small: Number(product.price_small),
+        Medium: Number(product.price_medium),
+        Large: Number(product.price_large),
+      }
+    : { Small: 0, Medium: 0, Large: 0 };
+
+  const selectedPrice = priceMap[selectedSize];
+
+  /* ================= IMAGE ================= */
+
+  const imageUri = product?.image?.startsWith("http")
+    ? product.image
+    : product?.image
+    ? `http://${API_HOST}${product.image}`
+    : null;
+
+  /* ================= CART ================= */
 
   const handleAddToCart = () => {
     if (!product) return;
+
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
     addItem({
       product_id: product.id,
       name: product.name,
@@ -70,20 +116,17 @@ export default function ProductDetailScreen() {
       price: selectedPrice,
       quantity,
     });
+
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
   };
 
-  const imageUri = product?.image?.startsWith("http")
-    ? product.image
-    : product?.image
-    ? `${getApiUrl().replace(/\/$/, "")}${product.image}`
-    : null;
-
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
-  if (isLoading) {
+  /* ================= LOADING ================= */
+
+  if (loading) {
     return (
       <View style={[styles.loadingContainer, { paddingTop: topPad }]}>
         <ActivityIndicator size="large" color={colors.primary} />
@@ -91,11 +134,12 @@ export default function ProductDetailScreen() {
     );
   }
 
-  if (error || !product) {
+  if (!product) {
     return (
       <View style={[styles.loadingContainer, { paddingTop: topPad }]}>
         <Ionicons name="alert-circle-outline" size={48} color={colors.error} />
         <Text style={styles.errorText}>Product not found</Text>
+
         <Pressable style={styles.backBtn} onPress={() => router.back()}>
           <Text style={styles.backBtnText}>Go Back</Text>
         </Pressable>
@@ -103,24 +147,28 @@ export default function ProductDetailScreen() {
     );
   }
 
+  /* ================= UI ================= */
+
   return (
     <View style={styles.container}>
-      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false} bounces>
-        {/* Product Image */}
+      <ScrollView showsVerticalScrollIndicator={false}>
+
+        {/* IMAGE */}
         <View style={styles.imageContainer}>
           {imageUri ? (
-            <Image source={{ uri: imageUri }} style={styles.image} resizeMode="cover" />
+            <Image source={{ uri: imageUri }} style={styles.image} />
           ) : (
             <View style={[styles.image, styles.imagePlaceholder]}>
               <Ionicons name="restaurant" size={80} color={colors.textLight} />
             </View>
           )}
+
           <LinearGradient
             colors={["rgba(0,0,0,0.35)", "transparent"]}
             style={styles.imageGradient}
           />
 
-          {/* Back button */}
+          {/* BACK */}
           <Pressable
             style={[styles.backCircle, { top: topPad + 12 }]}
             onPress={() => router.back()}
@@ -128,7 +176,7 @@ export default function ProductDetailScreen() {
             <Ionicons name="arrow-back" size={22} color="#FFF" />
           </Pressable>
 
-          {/* Cart button */}
+          {/* CART */}
           <Pressable
             style={[styles.cartCircle, { top: topPad + 12 }]}
             onPress={() => router.push("/(tabs)/cart")}
@@ -144,36 +192,64 @@ export default function ProductDetailScreen() {
           )}
         </View>
 
+        {/* CONTENT */}
+
         <View style={styles.content}>
           <View style={styles.titleRow}>
             <View style={{ flex: 1 }}>
               {product.category_name && (
-                <Text style={styles.categoryLabel}>{product.category_name}</Text>
+                <Text style={styles.categoryLabel}>
+                  {product.category_name}
+                </Text>
               )}
               <Text style={styles.productName}>{product.name}</Text>
             </View>
-            <Text style={styles.priceDisplay}>${selectedPrice.toFixed(2)}</Text>
+
+            <Text style={styles.priceDisplay}>
+              ${selectedPrice.toFixed(2)}
+            </Text>
           </View>
 
-          {product.description ? (
+          {product.description && (
             <Text style={styles.description}>{product.description}</Text>
-          ) : null}
+          )}
 
-          {/* Size Selection */}
-          <View style={styles.sizeSection}>
+          {/* SIZE */}
+          <View>
             <Text style={styles.sectionLabel}>Select Size</Text>
+
             <View style={styles.sizeGrid}>
               {sizes.map((size) => {
-                const price = parseFloat(priceMap[size] || "0");
+                const price = priceMap[size];
                 const isSelected = selectedSize === size;
+
                 return (
                   <Pressable
                     key={size}
-                    style={[styles.sizeCard, isSelected && styles.sizeCardActive]}
-                    onPress={() => { Haptics.selectionAsync(); setSelectedSize(size); }}
+                    style={[
+                      styles.sizeCard,
+                      isSelected && styles.sizeCardActive,
+                    ]}
+                    onPress={() => {
+                      Haptics.selectionAsync();
+                      setSelectedSize(size);
+                    }}
                   >
-                    <Text style={[styles.sizeName, isSelected && styles.sizeNameActive]}>{size}</Text>
-                    <Text style={[styles.sizePrice, isSelected && styles.sizePriceActive]}>
+                    <Text
+                      style={[
+                        styles.sizeName,
+                        isSelected && styles.sizeNameActive,
+                      ]}
+                    >
+                      {size}
+                    </Text>
+
+                    <Text
+                      style={[
+                        styles.sizePrice,
+                        isSelected && styles.sizePriceActive,
+                      ]}
+                    >
                       ${price.toFixed(2)}
                     </Text>
                   </Pressable>
@@ -182,20 +258,24 @@ export default function ProductDetailScreen() {
             </View>
           </View>
 
-          {/* Quantity */}
-          <View style={styles.quantitySection}>
+          {/* QUANTITY */}
+
+          <View>
             <Text style={styles.sectionLabel}>Quantity</Text>
+
             <View style={styles.quantityControl}>
               <Pressable
                 style={styles.qtyButton}
-                onPress={() => { Haptics.selectionAsync(); setQuantity(Math.max(1, quantity - 1)); }}
+                onPress={() => setQuantity(Math.max(1, quantity - 1))}
               >
                 <Ionicons name="remove" size={20} color={colors.text} />
               </Pressable>
+
               <Text style={styles.qtyText}>{quantity}</Text>
+
               <Pressable
                 style={styles.qtyButton}
-                onPress={() => { Haptics.selectionAsync(); setQuantity(quantity + 1); }}
+                onPress={() => setQuantity(quantity + 1)}
               >
                 <Ionicons name="add" size={20} color={colors.primary} />
               </Pressable>
@@ -206,23 +286,35 @@ export default function ProductDetailScreen() {
         </View>
       </ScrollView>
 
-      {/* Add to Cart Button */}
+      {/* FOOTER */}
+
       <View style={[styles.footer, { paddingBottom: bottomPad + 24 }]}>
-        <View style={styles.footerTotal}>
+        <View>
           <Text style={styles.footerTotalLabel}>Total</Text>
-          <Text style={styles.footerTotalAmount}>${(selectedPrice * quantity).toFixed(2)}</Text>
+          <Text style={styles.footerTotalAmount}>
+            ${(selectedPrice * quantity).toFixed(2)}
+          </Text>
         </View>
+
         <Pressable
           style={[styles.addButton, added && styles.addButtonAdded]}
           onPress={handleAddToCart}
         >
-          <Ionicons name={added ? "checkmark-circle" : "cart"} size={20} color="#FFF" />
-          <Text style={styles.addButtonText}>{added ? "Added to Cart!" : "Add to Cart"}</Text>
+          <Ionicons
+            name={added ? "checkmark-circle" : "cart"}
+            size={20}
+            color="#FFF"
+          />
+          <Text style={styles.addButtonText}>
+            {added ? "Added to Cart!" : "Add to Cart"}
+          </Text>
         </Pressable>
       </View>
     </View>
   );
 }
+
+/* ================= STYLES SAME ================= */
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
@@ -230,25 +322,35 @@ const styles = StyleSheet.create({
   errorText: { fontSize: 18, fontWeight: "600", color: colors.text },
   backBtn: { backgroundColor: colors.primary, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 },
   backBtnText: { color: "#FFF", fontWeight: "600" },
-  scroll: { flex: 1 },
+
   imageContainer: { position: "relative", height: height * 0.42 },
   image: { width: "100%", height: "100%" },
   imagePlaceholder: { backgroundColor: "#F3F4F6", alignItems: "center", justifyContent: "center" },
+
   imageGradient: { position: "absolute", top: 0, left: 0, right: 0, height: 120 },
+
   backCircle: {
     position: "absolute",
     left: 16,
-    width: 44, height: 44, borderRadius: 22,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: "rgba(0,0,0,0.4)",
-    alignItems: "center", justifyContent: "center",
+    alignItems: "center",
+    justifyContent: "center",
   },
+
   cartCircle: {
     position: "absolute",
     right: 16,
-    width: 44, height: 44, borderRadius: 22,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: "rgba(0,0,0,0.4)",
-    alignItems: "center", justifyContent: "center",
+    alignItems: "center",
+    justifyContent: "center",
   },
+
   featuredBadge: {
     position: "absolute",
     bottom: 16,
@@ -261,16 +363,35 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
+
   featuredBadgeText: { color: "#FFF", fontSize: 11, fontWeight: "700" },
+
   content: { padding: 20, gap: 20 },
-  titleRow: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
-  categoryLabel: { fontSize: 12, color: colors.primary, fontWeight: "600", textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 },
-  productName: { fontSize: 26, fontWeight: "800", color: colors.text, lineHeight: 32 },
-  priceDisplay: { fontSize: 28, fontWeight: "800", color: colors.primary, paddingTop: 8 },
-  description: { fontSize: 15, color: colors.textSecondary, lineHeight: 22 },
-  sectionLabel: { fontSize: 14, fontWeight: "700", color: colors.text, marginBottom: 10, textTransform: "uppercase", letterSpacing: 0.5 },
-  sizeSection: {},
+
+  titleRow: { flexDirection: "row", gap: 12 },
+
+  categoryLabel: {
+    fontSize: 12,
+    color: colors.primary,
+    fontWeight: "600",
+    textTransform: "uppercase",
+  },
+
+  productName: { fontSize: 26, fontWeight: "800", color: colors.text },
+
+  priceDisplay: { fontSize: 28, fontWeight: "800", color: colors.primary },
+
+  description: { fontSize: 15, color: colors.textSecondary },
+
+  sectionLabel: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: colors.text,
+    marginBottom: 10,
+  },
+
   sizeGrid: { flexDirection: "row", gap: 10 },
+
   sizeCard: {
     flex: 1,
     alignItems: "center",
@@ -279,47 +400,44 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.border,
     backgroundColor: "#FFF",
-    gap: 4,
   },
-  sizeCardActive: { borderColor: colors.primary, backgroundColor: colors.primaryPale },
+
+  sizeCardActive: { borderColor: colors.primary },
+
   sizeName: { fontSize: 14, fontWeight: "700", color: colors.textSecondary },
   sizeNameActive: { color: colors.primary },
-  sizePrice: { fontSize: 13, fontWeight: "600", color: colors.textLight },
+
+  sizePrice: { fontSize: 13, color: colors.textLight },
   sizePriceActive: { color: colors.primaryDark },
-  quantitySection: {},
-  quantityControl: { flexDirection: "row", alignItems: "center", gap: 0, alignSelf: "flex-start" },
+
+  quantityControl: { flexDirection: "row", alignItems: "center" },
+
   qtyButton: {
-    width: 46, height: 46, borderRadius: 14,
+    width: 46,
+    height: 46,
+    borderRadius: 14,
     backgroundColor: colors.borderLight,
-    alignItems: "center", justifyContent: "center",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  qtyText: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: colors.text,
-    minWidth: 50,
-    textAlign: "center",
-  },
+
+  qtyText: { fontSize: 20, fontWeight: "800", minWidth: 50, textAlign: "center" },
+
   footer: {
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
     padding: 20,
-    paddingTop: 16,
     backgroundColor: "#FFF",
     flexDirection: "row",
     alignItems: "center",
     gap: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 12,
   },
-  footerTotal: { gap: 2 },
-  footerTotalLabel: { fontSize: 11, color: colors.textSecondary, fontWeight: "500" },
+
+  footerTotalLabel: { fontSize: 11, color: colors.textSecondary },
   footerTotalAmount: { fontSize: 22, fontWeight: "800", color: colors.text },
+
   addButton: {
     flex: 1,
     flexDirection: "row",
@@ -329,12 +447,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     borderRadius: 16,
     paddingVertical: 16,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 8,
   },
+
   addButtonAdded: { backgroundColor: colors.success },
+
   addButtonText: { color: "#FFF", fontSize: 16, fontWeight: "700" },
 });

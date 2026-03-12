@@ -16,36 +16,31 @@ import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
-import { fetch } from "expo/fetch";
 import colors from "@/constants/colors";
 import { useAuth } from "@/contexts/auth";
-import { getApiUrl } from "@/lib/query-client";
 
 const ORDER_STATUSES = ["Pending", "Confirmed", "Preparing", "Out for Delivery", "Delivered"];
 
+// ---------------- API ----------------
 async function fetchAdminOrders(token: string) {
-  const base = getApiUrl();
-  const res = await fetch(`${base}api/admin/orders`, {
+  const res = await fetch(`http://10.81.83.70:5000/api/admin/orders`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) throw new Error("Failed");
+  if (!res.ok) throw new Error("Failed to fetch orders");
   return res.json();
 }
 
 async function updateOrderStatus(token: string, orderId: number, status: string) {
-  const base = getApiUrl();
-  const res = await fetch(`${base}api/admin/orders/${orderId}/status`, {
+  const res = await fetch(`http://10.81.83.70:5000/api/admin/orders/${orderId}/status`, {
     method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify({ status }),
   });
-  if (!res.ok) throw new Error("Failed");
+  if (!res.ok) throw new Error("Failed to update status");
   return res.json();
 }
 
+// ---------------- STATUS PILL ----------------
 function StatusPill({ status }: { status: string }) {
   const c = colors.statusColors[status] || "#6B7280";
   return (
@@ -55,12 +50,14 @@ function StatusPill({ status }: { status: string }) {
     </View>
   );
 }
+
 const pillStyles = StyleSheet.create({
   pill: { flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1 },
   dot: { width: 6, height: 6, borderRadius: 3 },
   text: { fontSize: 11, fontWeight: "700" },
 });
 
+// ---------------- MAIN COMPONENT ----------------
 export default function AdminOrdersScreen() {
   const insets = useSafeAreaInsets();
   const { token } = useAuth();
@@ -75,22 +72,26 @@ export default function AdminOrdersScreen() {
     enabled: !!token,
   });
 
+  // ---------------- MUTATION ----------------
   const mutation = useMutation({
     mutationFn: ({ orderId, status }: { orderId: number; status: string }) =>
       updateOrderStatus(token!, orderId, status),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
-      setStatusModal(false);
+    onSuccess: (updatedOrder) => {
+      // 1️⃣ Update orders list
+      queryClient.setQueryData(["admin-orders", token], (old: any) => {
+        if (!old) return [];
+        return old.map((o: any) => (o.id === updatedOrder.id ? updatedOrder : o));
+      });
+      // 2️⃣ Update selected order immediately so modal shows new status
+      setSelectedOrder((prev: any) => (prev?.id === updatedOrder.id ? updatedOrder : prev));
     },
     onError: () => Alert.alert("Error", "Failed to update status"),
   });
 
   return (
     <View style={styles.container}>
-      <LinearGradient
-        colors={["#1E293B", "#334155"]}
-        style={[styles.header, { paddingTop: topPad + 12 }]}
-      >
+      {/* HEADER */}
+      <LinearGradient colors={["#1E293B", "#334155"]} style={[styles.header, { paddingTop: topPad + 12 }]}>
         <Pressable style={styles.backBtn} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={22} color="#FFF" />
         </Pressable>
@@ -98,6 +99,7 @@ export default function AdminOrdersScreen() {
         <Text style={styles.orderCount}>{orders.length} total</Text>
       </LinearGradient>
 
+      {/* ORDERS LIST */}
       <ScrollView
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
@@ -119,6 +121,7 @@ export default function AdminOrdersScreen() {
                 style={styles.orderCard}
                 onPress={() => { setSelectedOrder(order); setStatusModal(true); }}
               >
+                {/* HEADER */}
                 <View style={styles.orderHeader}>
                   <View>
                     <Text style={styles.orderId}>Order #{order.id}</Text>
@@ -129,6 +132,7 @@ export default function AdminOrdersScreen() {
                   <StatusPill status={order.status} />
                 </View>
 
+                {/* CUSTOMER INFO */}
                 <View style={styles.orderInfo}>
                   <View style={styles.infoRow}>
                     <Ionicons name="person-outline" size={13} color={colors.textSecondary} />
@@ -142,10 +146,24 @@ export default function AdminOrdersScreen() {
                     <Ionicons name="location-outline" size={13} color={colors.textSecondary} />
                     <Text style={styles.infoText} numberOfLines={1}>{order.address}</Text>
                   </View>
+                  {/* PRODUCTS */}
+                  <View style={{ marginTop: 6 }}>
+                    {order.items?.map((item: any, i: number) => (
+                      <Text key={i} style={{ fontSize: 12, color: "#555" }}>
+                        • {item.name || item.product_name} ({item.size}) × {item.quantity}
+                      </Text>
+                    ))}
+                  </View>
                 </View>
 
+                {/* FOOTER */}
                 <View style={styles.orderFooter}>
-                  <Text style={styles.itemCount}>{(order.items || []).length} items</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.itemCount}>{(order.items || []).length} items</Text>
+                    {order.coupon_code && (
+                      <Text style={{ fontSize: 11, color: "#10B981" }}>Coupon: {order.coupon_code}</Text>
+                    )}
+                  </View>
                   <Text style={styles.orderTotal}>${parseFloat(order.total_amount).toFixed(2)}</Text>
                   <Text style={styles.tapHint}>Tap to change status</Text>
                 </View>
@@ -156,7 +174,7 @@ export default function AdminOrdersScreen() {
         <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* Status Modal */}
+      {/* STATUS MODAL */}
       <Modal visible={statusModal} transparent animationType="slide">
         <Pressable style={styles.modalOverlay} onPress={() => setStatusModal(false)}>
           <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
@@ -177,9 +195,7 @@ export default function AdminOrdersScreen() {
                     disabled={mutation.isPending}
                   >
                     <View style={[styles.statusDot, { backgroundColor: c }]} />
-                    <Text style={[styles.statusOptionText, isSelected && { color: c, fontWeight: "700" }]}>
-                      {status}
-                    </Text>
+                    <Text style={[styles.statusOptionText, isSelected && { color: c, fontWeight: "700" }]}>{status}</Text>
                     {isSelected && <Ionicons name="checkmark-circle" size={18} color={c} />}
                   </Pressable>
                 );
@@ -193,6 +209,7 @@ export default function AdminOrdersScreen() {
   );
 }
 
+// ---------------- STYLES ----------------
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   header: { paddingHorizontal: 20, paddingBottom: 18, gap: 4 },
@@ -201,17 +218,7 @@ const styles = StyleSheet.create({
   orderCount: { fontSize: 13, color: "rgba(255,255,255,0.7)" },
   scroll: { flex: 1 },
   list: { padding: 16, gap: 12 },
-  orderCard: {
-    backgroundColor: "#FFF",
-    borderRadius: 16,
-    padding: 14,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 8,
-    elevation: 4,
-    gap: 12,
-  },
+  orderCard: { backgroundColor: "#FFF", borderRadius: 16, padding: 14, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 4, gap: 12 },
   orderHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
   orderId: { fontSize: 15, fontWeight: "700", color: colors.text },
   orderType: { fontSize: 11, color: colors.textSecondary, marginTop: 2 },
@@ -225,26 +232,12 @@ const styles = StyleSheet.create({
   emptyState: { alignItems: "center", paddingTop: 64, gap: 12 },
   emptyText: { fontSize: 16, color: colors.textSecondary },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
-  modalContent: {
-    backgroundColor: "#FFF",
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    padding: 24,
-    paddingTop: 16,
-  },
+  modalContent: { backgroundColor: "#FFF", borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingTop: 16 },
   modalHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: "#E5E7EB", alignSelf: "center", marginBottom: 20 },
   modalTitle: { fontSize: 20, fontWeight: "800", color: colors.text, marginBottom: 4 },
   modalSubtitle: { fontSize: 13, color: colors.textSecondary, marginBottom: 20 },
   statusList: { gap: 10 },
-  statusOption: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-  },
+  statusOption: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: 12, borderWidth: 1.5, borderColor: colors.border },
   statusDot: { width: 10, height: 10, borderRadius: 5 },
   statusOptionText: { flex: 1, fontSize: 15, fontWeight: "500", color: colors.text },
 });

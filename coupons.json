@@ -1,0 +1,24 @@
+[
+  {
+    "id": 1,
+    "name": "Summer Sale",
+    "description": "It's a summer sale",
+    "code": "SAVE20",
+    "discount_type": "percentage",
+    "discount_value": 20,
+    "minimum_order": 100,
+    "expiry_date": "2020-16-15",
+    "is_active": true
+  },
+  {
+    "id": 2,
+    "name": "Winter sale",
+    "description": "It's a good",
+    "code": "DEAL50",
+    "discount_type": "percentage",
+    "discount_value": 45,
+    "minimum_order": 12,
+    "expiry_date": "2025-15-18",
+    "is_active": true
+  }
+]

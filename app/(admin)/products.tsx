@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -13,94 +13,49 @@ import {
   Image,
   RefreshControl,
 } from "react-native";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
-import { fetch } from "expo/fetch";
 import * as ImagePicker from "expo-image-picker";
 import colors from "@/constants/colors";
-import { useAuth } from "@/contexts/auth";
-import { getApiUrl } from "@/lib/query-client";
 
-async function fetchAdminProducts(token: string) {
-  const base = getApiUrl();
-  const res = await fetch(`${base}api/admin/products`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
+interface Product {
+  id: number;
+  name: string;
+  description?: string;
+  category_id?: number;
+  category_name?: string;
+  price_small: number;
+  price_medium: number;
+  price_large: number;
+  is_active: boolean;
+  is_highlighted: boolean;
+  image?: string;
 }
 
-async function fetchCategories(token: string) {
-  const base = getApiUrl();
-  const res = await fetch(`${base}api/admin/categories`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
+interface Category {
+  id: number;
+  name: string;
 }
 
-async function createProduct(token: string, formData: any) {
-  const base = getApiUrl();
-  const body = new FormData();
-  Object.entries(formData).forEach(([k, v]) => {
-    if (v !== null && v !== undefined && k !== "image_uri") {
-      body.append(k, String(v));
-    }
-  });
-  if (formData.image_uri) {
-    const filename = formData.image_uri.split("/").pop() || "photo.jpg";
-    body.append("image", { uri: formData.image_uri, name: filename, type: "image/jpeg" } as any);
-  }
-  const res = await fetch(`${base}api/admin/products`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-    body,
-  });
-  if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
-  return res.json();
-}
+// Fix API_HOST for all platforms
+const API_HOST = "https://food-delivery-business-production.up.railway.app/";
 
-async function toggleProduct(token: string, id: number, is_active: boolean) {
-  const base = getApiUrl();
-  const res = await fetch(`${base}api/admin/products/${id}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ is_active }),
-  });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-
-async function toggleHighlight(token: string, id: number, is_highlighted: boolean) {
-  const base = getApiUrl();
-  const res = await fetch(`${base}api/admin/products/${id}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ is_highlighted }),
-  });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
-
-async function deleteProduct(token: string, id: number) {
-  const base = getApiUrl();
-  const res = await fetch(`${base}api/admin/products/${id}`, {
-    method: "DELETE",
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok) throw new Error("Failed");
-  return res.json();
-}
+const API_URL = `http://${API_HOST}/api/admin`;
 
 export default function AdminProductsScreen() {
   const insets = useSafeAreaInsets();
-  const { token } = useAuth();
-  const queryClient = useQueryClient();
+  const topPad = Platform.OS === "web" ? 67 : insets.top;
+
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
   const [modal, setModal] = useState(false);
   const [imageUri, setImageUri] = useState<string | null>(null);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [form, setForm] = useState({
     name: "",
     description: "",
@@ -111,76 +66,165 @@ export default function AdminProductsScreen() {
     is_highlighted: "false",
   });
   const [formError, setFormError] = useState("");
-  const topPad = Platform.OS === "web" ? 67 : insets.top;
-  const base = getApiUrl().replace(/\/$/, "");
 
-  const { data: products = [], isLoading, refetch, isFetching } = useQuery({
-    queryKey: ["admin-products", token],
-    queryFn: () => fetchAdminProducts(token!),
-    enabled: !!token,
-  });
+  /* ================= FETCH ================= */
+  const fetchProducts = async () => {
+    try {
+      const res = await fetch(`${API_URL}/products`);
+      if (!res.ok) throw new Error("Failed to fetch products");
+      const data = await res.json();
+      setProducts(data);
+    } catch (e: any) {
+      Alert.alert("Error", e.message || "Failed to fetch products");
+    }
+  };
 
-  const { data: categories = [] } = useQuery({
-    queryKey: ["admin-categories-pick", token],
-    queryFn: () => fetchCategories(token!),
-    enabled: !!token,
-  });
+  const fetchCategories = async () => {
+    try {
+      const res = await fetch(`${API_URL}/categories`);
+      if (!res.ok) throw new Error("Failed to fetch categories");
+      const data = await res.json();
+      setCategories(data);
+    } catch (e: any) {
+      Alert.alert("Error", e.message || "Failed to fetch categories");
+    }
+  };
 
-  const createMutation = useMutation({
-    mutationFn: () => createProduct(token!, {
-      ...form,
-      price_small: parseFloat(form.price_small) || 0,
-      price_medium: parseFloat(form.price_medium) || 0,
-      price_large: parseFloat(form.price_large) || 0,
-      image_uri: imageUri,
-    }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-products"] });
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      await fetchCategories();
+      await fetchProducts();
+      setLoading(false);
+    };
+    loadData();
+  }, []);
+
+  /* ================= MODAL / FORM ================= */
+  const openModalForEdit = (product: Product) => {
+    setEditingProduct(product);
+    setForm({
+      name: product.name,
+      description: product.description || "",
+      category_id: String(product.category_id || ""),
+      price_small: String(product.price_small),
+      price_medium: String(product.price_medium),
+      price_large: String(product.price_large),
+      is_highlighted: product.is_highlighted ? "true" : "false",
+    });
+    setImageUri(product.image?.startsWith("http") ? product.image : null);
+    setModal(true);
+  };
+
+  const handleSave = async () => {
+    if (!form.name.trim()) {
+      setFormError("Name is required");
+      return;
+    }
+    if (!form.price_medium.trim()) {
+      setFormError("Medium price is required");
+      return;
+    }
+    setFormError("");
+
+    const body = new FormData();
+    Object.entries(form).forEach(([key, value]) => body.append(key, String(value)));
+
+    if (imageUri && !imageUri.startsWith("http")) {
+      const filename = imageUri.split("/").pop() || "photo.jpg";
+      const file: any = {
+        uri: Platform.OS === "android" ? imageUri : imageUri.replace("file://", ""),
+        name: filename,
+        type: "image/jpeg",
+      };
+      body.append("image", file);
+    }
+
+    try {
+      let res;
+      if (editingProduct) {
+        // UPDATE PRODUCT
+        res = await fetch(`${API_URL}/products/${editingProduct.id}`, {
+          method: "PUT",
+          body,
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      } else {
+        // CREATE PRODUCT
+        res = await fetch(`${API_URL}/products`, {
+          method: "POST",
+          body,
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      }
+
+      if (!res.ok) throw new Error("Failed to save product");
+
       setModal(false);
-      setForm({ name: "", description: "", category_id: "", price_small: "", price_medium: "", price_large: "", is_highlighted: "false" });
+      setEditingProduct(null);
+      setForm({
+        name: "",
+        description: "",
+        category_id: "",
+        price_small: "",
+        price_medium: "",
+        price_large: "",
+        is_highlighted: "false",
+      });
       setImageUri(null);
-    },
-    onError: (e: any) => setFormError(e.message || "Failed"),
-  });
-
-  const toggleMutation = useMutation({
-    mutationFn: ({ id, is_active }: { id: number; is_active: boolean }) => toggleProduct(token!, id, is_active),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-products"] }),
-  });
-
-  const highlightMutation = useMutation({
-    mutationFn: ({ id, is_highlighted }: { id: number; is_highlighted: boolean }) => toggleHighlight(token!, id, is_highlighted),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-products"] }),
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => deleteProduct(token!, id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-products"] }),
-  });
+      fetchProducts();
+    } catch (e: any) {
+      setFormError(e.message || "Error saving product");
+    }
+  };
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") return;
+    if (status !== "granted") {
+      Alert.alert("Permission required", "Camera roll permission is required");
+      return;
+    }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: "images",
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: false,
       quality: 0.8,
     });
     if (!result.canceled) setImageUri(result.assets[0].uri);
   };
 
-  const handleSave = () => {
-    if (!form.name.trim()) { setFormError("Name is required"); return; }
-    if (!form.price_medium) { setFormError("Medium price is required"); return; }
-    setFormError("");
-    createMutation.mutate();
+  const getProductImage = (product: Product) =>
+    product.image?.startsWith("http")
+      ? product.image
+      : product.image
+      ? `http://${API_HOST}${product.image}`
+      : null;
+
+  /* ================= ACTIONS ================= */
+  const toggleHighlight = async (product: Product) => {
+    try {
+      await fetch(`${API_URL}/products/${product.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_highlighted: !product.is_highlighted }),
+      });
+      fetchProducts();
+    } catch {
+      Alert.alert("Error", "Failed to update highlight");
+    }
   };
 
-  const getProductImage = (product: any) =>
-    product.image?.startsWith("http") ? product.image : product.image ? `${base}${product.image}` : null;
+  const deleteProduct = async (id: number) => {
+    try {
+      await fetch(`${API_URL}/products/${id}`, { method: "DELETE" });
+      fetchProducts();
+    } catch {
+      Alert.alert("Error", "Failed to delete product");
+    }
+  };
 
   return (
     <View style={styles.container}>
+      {/* Header */}
       <LinearGradient
         colors={["#1E293B", "#334155"]}
         style={[styles.header, { paddingTop: topPad + 12 }]}
@@ -198,13 +242,23 @@ export default function AdminProductsScreen() {
         </View>
       </LinearGradient>
 
+      {/* Product List */}
       <ScrollView
         style={styles.scroll}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={async () => {
+              setRefreshing(true);
+              await fetchProducts();
+              setRefreshing(false);
+            }}
+            tintColor={colors.primary}
+          />
+        }
         showsVerticalScrollIndicator={false}
-        contentInsetAdjustmentBehavior="automatic"
-        refreshControl={<RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={colors.primary} />}
       >
-        {isLoading ? (
+        {loading ? (
           <ActivityIndicator color={colors.primary} style={{ marginTop: 48 }} />
         ) : products.length === 0 ? (
           <View style={styles.emptyState}>
@@ -213,48 +267,54 @@ export default function AdminProductsScreen() {
           </View>
         ) : (
           <View style={styles.list}>
-            {products.map((product: any) => {
+            {products.map((product) => {
               const imageUri = getProductImage(product);
               return (
                 <View key={product.id} style={[styles.productCard, !product.is_active && { opacity: 0.65 }]}>
                   <View style={styles.productTop}>
                     {imageUri ? (
-                      <Image source={{ uri: imageUri }} style={styles.productImage} resizeMode="cover" />
+                      <Image source={{ uri: imageUri }} style={styles.productImage} />
                     ) : (
                       <View style={[styles.productImage, styles.productImagePlaceholder]}>
                         <Ionicons name="image-outline" size={24} color={colors.textLight} />
                       </View>
                     )}
                     <View style={styles.productInfo}>
-                      <Text style={styles.productName} numberOfLines={1}>{product.name}</Text>
+                      <Text style={styles.productName}>{product.name}</Text>
                       <Text style={styles.productCategory}>{product.category_name || "Uncategorized"}</Text>
                       <View style={styles.priceRow}>
-                        <Text style={styles.priceLabel}>S: ${parseFloat(product.price_small).toFixed(2)}</Text>
-                        <Text style={styles.priceLabel}>M: ${parseFloat(product.price_medium).toFixed(2)}</Text>
-                        <Text style={styles.priceLabel}>L: ${parseFloat(product.price_large).toFixed(2)}</Text>
+                        <Text style={styles.priceLabel}>S: ₹{product.price_small.toFixed(2)}</Text>
+                        <Text style={styles.priceLabel}>M: ₹{product.price_medium.toFixed(2)}</Text>
+                        <Text style={styles.priceLabel}>L: ₹{product.price_large.toFixed(2)}</Text>
                       </View>
                     </View>
                   </View>
-
                   <View style={styles.productActions}>
                     <Pressable
                       style={[styles.actionBtn, product.is_highlighted && styles.actionBtnActive]}
-                      onPress={() => highlightMutation.mutate({ id: product.id, is_highlighted: !product.is_highlighted })}
+                      onPress={() => toggleHighlight(product)}
                     >
-                      <Ionicons name={product.is_highlighted ? "star" : "star-outline"} size={16} color={product.is_highlighted ? colors.warning : colors.textSecondary} />
+                      <Ionicons
+                        name={product.is_highlighted ? "star" : "star-outline"}
+                        size={16}
+                        color={product.is_highlighted ? colors.warning : colors.textSecondary}
+                      />
                     </Pressable>
+                    {/* EDIT ICON */}
                     <Pressable
-                      style={[styles.actionBtn, !product.is_active && styles.actionBtnWarning]}
-                      onPress={() => toggleMutation.mutate({ id: product.id, is_active: !product.is_active })}
+                      style={[styles.actionBtn, { backgroundColor: "#FEF2F2" }]}
+                      onPress={() => openModalForEdit(product)}
                     >
-                      <Ionicons name={product.is_active ? "eye-outline" : "eye-off-outline"} size={16} color={product.is_active ? colors.info : colors.error} />
+                      <Ionicons name="pencil-outline" size={16} color={colors.primary} />
                     </Pressable>
                     <Pressable
                       style={[styles.actionBtn, { backgroundColor: "#FEF2F2" }]}
-                      onPress={() => Alert.alert("Delete", `Delete "${product.name}"?`, [
-                        { text: "Cancel", style: "cancel" },
-                        { text: "Delete", style: "destructive", onPress: () => deleteMutation.mutate(product.id) },
-                      ])}
+                      onPress={() =>
+                        Alert.alert("Delete", `Delete "${product.name}"?`, [
+                          { text: "Cancel", style: "cancel" },
+                          { text: "Delete", style: "destructive", onPress: () => deleteProduct(product.id) },
+                        ])
+                      }
                     >
                       <Ionicons name="trash-outline" size={16} color={colors.error} />
                     </Pressable>
@@ -267,13 +327,13 @@ export default function AdminProductsScreen() {
         <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* Add Product Modal */}
+      {/* Modal */}
       <Modal visible={modal} transparent animationType="slide">
         <Pressable style={styles.modalOverlay} onPress={() => setModal(false)}>
           <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
-            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <ScrollView keyboardShouldPersistTaps="handled">
               <View style={styles.modalHandle} />
-              <Text style={styles.modalTitle}>Add Product</Text>
+              <Text style={styles.modalTitle}>{editingProduct ? "Edit Product" : "Add Product"}</Text>
 
               {formError ? (
                 <View style={styles.errorBanner}>
@@ -281,10 +341,9 @@ export default function AdminProductsScreen() {
                 </View>
               ) : null}
 
-              {/* Image picker */}
               <Pressable style={styles.imagePicker} onPress={pickImage}>
                 {imageUri ? (
-                  <Image source={{ uri: imageUri }} style={styles.imagePickerPreview} resizeMode="cover" />
+                  <Image source={{ uri: imageUri }} style={styles.imagePickerPreview} />
                 ) : (
                   <View style={styles.imagePickerEmpty}>
                     <Ionicons name="camera-outline" size={28} color={colors.primary} />
@@ -293,28 +352,28 @@ export default function AdminProductsScreen() {
                 )}
               </Pressable>
 
-              {[
-                { key: "name", label: "Product Name *", placeholder: "e.g. Margherita Pizza" },
-                { key: "description", label: "Description", placeholder: "Short description", multiline: true },
-              ].map((f) => (
-                <View key={f.key} style={styles.fieldGroup}>
-                  <Text style={styles.fieldLabel}>{f.label}</Text>
+              {["name", "description"].map((key) => (
+                <View key={key} style={styles.fieldGroup}>
+                  <Text style={styles.fieldLabel}>{key === "name" ? "Product Name *" : "Description"}</Text>
                   <TextInput
-                    style={[styles.fieldInput, f.multiline && { height: 60, textAlignVertical: "top" }]}
-                    placeholder={f.placeholder}
+                    style={[
+                      styles.fieldInput,
+                      key === "description" && { height: 60, textAlignVertical: "top" },
+                    ]}
+                    placeholder={key === "name" ? "e.g. Margherita Pizza" : "Short description"}
                     placeholderTextColor={colors.textLight}
-                    value={form[f.key as keyof typeof form]}
-                    onChangeText={(v) => setForm((p) => ({ ...p, [f.key]: v }))}
-                    multiline={f.multiline}
+                    value={form[key as keyof typeof form]}
+                    onChangeText={(v) => setForm((p) => ({ ...p, [key]: v }))}
+                    multiline={key === "description"}
                   />
                 </View>
               ))}
 
-              {/* Category */}
+              {/* Category Chips */}
               <View style={styles.fieldGroup}>
                 <Text style={styles.fieldLabel}>Category</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4 }}>
-                  {categories.map((cat: any) => (
+                  {categories.map((cat) => (
                     <Pressable
                       key={cat.id}
                       style={[styles.catChip, form.category_id === String(cat.id) && styles.catChipActive]}
@@ -330,20 +389,19 @@ export default function AdminProductsScreen() {
 
               {/* Prices */}
               <View style={styles.pricesRow}>
-                {[
-                  { key: "price_small", label: "Small ($)" },
-                  { key: "price_medium", label: "Medium ($) *" },
-                  { key: "price_large", label: "Large ($)" },
-                ].map((f) => (
-                  <View key={f.key} style={{ flex: 1 }}>
-                    <Text style={[styles.fieldLabel, { fontSize: 11 }]}>{f.label}</Text>
+                {["price_small", "price_medium", "price_large"].map((key) => (
+                  <View key={key} style={{ flex: 1 }}>
+                    <Text style={[styles.fieldLabel, { fontSize: 11 }]}>
+                      {key.replace("price_", "").toUpperCase()}
+                      {key === "price_medium" ? " *" : ""}
+                    </Text>
                     <TextInput
                       style={[styles.fieldInput, { marginTop: 4 }]}
                       placeholder="0.00"
                       placeholderTextColor={colors.textLight}
-                      value={form[f.key as keyof typeof form]}
-                      onChangeText={(v) => setForm((p) => ({ ...p, [f.key]: v }))}
                       keyboardType="numeric"
+                      value={form[key as keyof typeof form]}
+                      onChangeText={(v) => setForm((p) => ({ ...p, [key]: v }))}
                     />
                   </View>
                 ))}
@@ -352,28 +410,27 @@ export default function AdminProductsScreen() {
               {/* Highlight */}
               <Pressable
                 style={[styles.highlightToggle, form.is_highlighted === "true" && styles.highlightToggleActive]}
-                onPress={() => setForm((p) => ({ ...p, is_highlighted: p.is_highlighted === "true" ? "false" : "true" }))}
+                onPress={() =>
+                  setForm((p) => ({ ...p, is_highlighted: p.is_highlighted === "true" ? "false" : "true" }))
+                }
               >
-                <Ionicons name={form.is_highlighted === "true" ? "star" : "star-outline"} size={18} color={form.is_highlighted === "true" ? colors.warning : colors.textSecondary} />
+                <Ionicons
+                  name={form.is_highlighted === "true" ? "star" : "star-outline"}
+                  size={18}
+                  color={form.is_highlighted === "true" ? colors.warning : colors.textSecondary}
+                />
                 <Text style={[styles.highlightText, form.is_highlighted === "true" && { color: colors.warning }]}>
-                  Mark as Featured/Highlighted
+                  Mark as Featured
                 </Text>
               </Pressable>
 
+              {/* Buttons */}
               <View style={styles.modalButtons}>
                 <Pressable style={styles.cancelBtn} onPress={() => setModal(false)}>
                   <Text style={styles.cancelBtnText}>Cancel</Text>
                 </Pressable>
-                <Pressable
-                  style={[styles.saveBtn, createMutation.isPending && { opacity: 0.7 }]}
-                  onPress={handleSave}
-                  disabled={createMutation.isPending}
-                >
-                  {createMutation.isPending ? (
-                    <ActivityIndicator size="small" color="#FFF" />
-                  ) : (
-                    <Text style={styles.saveBtnText}>Add Product</Text>
-                  )}
+                <Pressable style={styles.saveBtn} onPress={handleSave}>
+                  <Text style={styles.saveBtnText}>{editingProduct ? "Update Product" : "Add Product"}</Text>
                 </Pressable>
               </View>
               <View style={{ height: 20 }} />
@@ -385,6 +442,7 @@ export default function AdminProductsScreen() {
   );
 }
 
+/* STYLES SAME AS BEFORE */
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   header: { paddingHorizontal: 20, paddingBottom: 18 },
@@ -394,16 +452,7 @@ const styles = StyleSheet.create({
   addBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center" },
   scroll: { flex: 1 },
   list: { padding: 16, gap: 12 },
-  productCard: {
-    backgroundColor: "#FFF",
-    borderRadius: 16,
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 8,
-    elevation: 4,
-  },
+  productCard: { backgroundColor: "#FFF", borderRadius: 16, overflow: "hidden", shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 4 },
   productTop: { flexDirection: "row", gap: 12, padding: 12 },
   productImage: { width: 80, height: 80, borderRadius: 12 },
   productImagePlaceholder: { backgroundColor: "#F3F4F6", alignItems: "center", justifyContent: "center" },
@@ -412,25 +461,9 @@ const styles = StyleSheet.create({
   productCategory: { fontSize: 12, color: colors.primary, fontWeight: "600" },
   priceRow: { flexDirection: "row", gap: 6 },
   priceLabel: { fontSize: 11, color: colors.textSecondary, fontWeight: "600" },
-  productActions: {
-    flexDirection: "row",
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingBottom: 12,
-    paddingTop: 4,
-    borderTopWidth: 1,
-    borderTopColor: colors.borderLight,
-  },
-  actionBtn: {
-    flex: 1,
-    height: 34,
-    borderRadius: 10,
-    backgroundColor: colors.borderLight,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  productActions: { flexDirection: "row", gap: 8, paddingHorizontal: 12, paddingBottom: 12, paddingTop: 4, borderTopWidth: 1, borderTopColor: colors.borderLight },
+  actionBtn: { flex: 1, height: 34, borderRadius: 10, backgroundColor: colors.borderLight, alignItems: "center", justifyContent: "center" },
   actionBtnActive: { backgroundColor: "#FFFBEB" },
-  actionBtnWarning: { backgroundColor: "#FEF2F2" },
   emptyState: { alignItems: "center", paddingTop: 64, gap: 12 },
   emptyText: { fontSize: 16, color: colors.textSecondary },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
@@ -447,7 +480,7 @@ const styles = StyleSheet.create({
   fieldLabel: { fontSize: 13, fontWeight: "600", color: colors.text, marginBottom: 4 },
   fieldInput: { backgroundColor: colors.borderLight, borderRadius: 12, padding: 12, fontSize: 14, color: colors.text, borderWidth: 1, borderColor: colors.border },
   catChip: { marginRight: 8, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1.5, borderColor: colors.border, backgroundColor: "#F9FAFB" },
-  catChipActive: { borderColor: colors.primary, backgroundColor: colors.primaryPale },
+  catChipActive: { borderColor: colors.primary, backgroundColor: "#EFF6FF" },
   catChipText: { fontSize: 13, fontWeight: "600", color: colors.textSecondary },
   catChipTextActive: { color: colors.primary },
   pricesRow: { flexDirection: "row", gap: 8, marginBottom: 12 },

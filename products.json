@@ -1,0 +1,54 @@
+[
+  {
+    "id": 1,
+    "name": "Najaj",
+    "description": "Jsjsjs",
+    "category_id": 2,
+    "category_name": "Beverages",
+    "price_small": 12,
+    "price_medium": 13,
+    "price_large": 14,
+    "is_active": true,
+    "is_highlighted": true,
+    "image": "/uploads/1773004307440.jpeg"
+  },
+  {
+    "id": 2,
+    "name": "Nsnssbsnx",
+    "description": "Jzjz",
+    "category_id": 1,
+    "category_name": "Pizza",
+    "price_small": 12,
+    "price_medium": 13,
+    "price_large": 14,
+    "is_active": true,
+    "is_highlighted": true,
+    "image": "/uploads/1772785229371.jpeg"
+  },
+  {
+    "id": 3,
+    "name": "Hdbsh",
+    "description": "Bxbzbbz",
+    "category_id": 1,
+    "category_name": "Pizza",
+    "price_small": 12,
+    "price_medium": 13,
+    "price_large": 14,
+    "is_active": true,
+    "is_highlighted": false,
+    "image": "/uploads/1772785760924.jpeg"
+  },
+  {
+    "id": 4,
+    "name": "Burger",
+    "description": "It's again for your",
+    "category_id": 1,
+    "category_name": "Pizza",
+    "price_small": 14,
+    "price_medium": 19,
+    "price_large": 80,
+    "is_active": true,
+    "is_highlighted": false,
+    "image": "/uploads/1772830592056.jpeg"
+  }
+]

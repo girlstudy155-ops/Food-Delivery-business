@@ -1,0 +1,4 @@
+[
+  { "id": 1, "name": "Pizza", "is_active": true },
+  { "id": 2, "name": "Beverages", "is_active": true }
+]
