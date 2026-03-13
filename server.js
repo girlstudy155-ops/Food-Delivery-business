@@ -447,7 +447,6 @@ app.post("/api/coupons/validate", (req, res) => {
 // -------------------- CREATE ORDER --------------------
 
 app.post("/api/orders", (req, res) => {
-
   const {
     items,
     total_amount,
@@ -456,7 +455,6 @@ app.post("/api/orders", (req, res) => {
     phone,
     notes,
     coupon_code,
-    user_id
   } = req.body;
 
   if (!items || items.length === 0) {
@@ -509,10 +507,9 @@ app.post("/api/orders", (req, res) => {
       : 1;
 
   const newOrder = {
-  id,
-  user_id: user_id || null,
-  created_at: new Date().toISOString(),
-  status: "pending",
+    id,
+    created_at: new Date().toISOString(),
+    status: "pending",
 
     customer: {
       name: name || "",
@@ -552,20 +549,8 @@ app.post("/api/orders", (req, res) => {
 
 // -------------------- GET USER ORDERS --------------------
 
-app.get("/api/orders/user", (req, res) => {
-
-  const { user_id } = req.query;
-
-  if (!user_id) {
-    return res.json([]);
-  }
-
-  const userOrders = orders.filter(
-    (o) => Number(o.user_id) === Number(user_id)
-  );
-
-  res.json(userOrders);
-
+app.get("/api/orders/user", (_req, res) => {
+  res.json(orders);
 });
 
 // -------------------- ERROR HANDLER --------------------
