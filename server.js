@@ -447,16 +447,17 @@ app.post("/api/coupons/validate", (req, res) => {
 // -------------------- CREATE ORDER --------------------
 
 app.post("/api/orders", (req, res) => {
-  const {
-    items,
-    total_amount,
-    address,
-    name,
-    phone,
-    notes,
-    coupon_code,
-  } = req.body;
-
+ const {
+  items,
+  total_amount,
+  address,
+  name,
+  phone,
+  notes,
+  coupon_code,
+  user_id,
+  guest_id
+} = req.body;
   if (!items || items.length === 0) {
     return res.status(400).json({ message: "Order items required" });
   }
@@ -507,16 +508,19 @@ app.post("/api/orders", (req, res) => {
       : 1;
 
   const newOrder = {
-    id,
-    created_at: new Date().toISOString(),
-    status: "pending",
+  id,
+  created_at: new Date().toISOString(),
+  status: "pending",
 
-    customer: {
-      name: name || "",
-      phone: phone || "",
-      address: address || "",
-      notes: notes || "",
-    },
+  user_id: user_id || null,
+  guest_id: guest_id || null,
+
+  customer: {
+    name: name || "",
+    phone: phone || "",
+    address: address || "",
+    notes: notes || "",
+  },
 
     coupon_code: coupon_code || null,
 
@@ -549,10 +553,22 @@ app.post("/api/orders", (req, res) => {
 
 // -------------------- GET USER ORDERS --------------------
 
-app.get("/api/orders/user", (_req, res) => {
-  res.json(orders);
-});
+app.get("/api/orders/user", (req, res) => {
 
+  const { user_id, guest_id } = req.query;
+
+  let userOrders = [];
+
+  if (user_id) {
+    userOrders = orders.filter(o => o.user_id == Number(user_id));
+  } 
+  else if (guest_id) {
+    userOrders = orders.filter(o => o.guest_id == guest_id);
+  }
+
+  res.json(userOrders);
+
+});
 // -------------------- ERROR HANDLER --------------------
 
 app.use((err, req, res, next) => {
