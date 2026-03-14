@@ -578,50 +578,53 @@ app.use((err, req, res, next) => {
   });
 });
 // -------------------- ADMIN GET ORDERS --------------------
-
 app.get("/api/admin/orders", (req, res) => {
 
-  const formattedOrders = orders.map((o) => ({
+  const formattedOrders = orders.map((o) => {
 
-    id: o.id,
-    created_at: o.created_at || new Date().toISOString(),
+    const user = users.find((u) => u.id === o.user_id);
 
-    status: o.status || "Pending",
+    return {
+      id: o.id,
+      created_at: o.created_at || new Date().toISOString(),
 
-    name: o.customer?.name || "",
-    phone: o.customer?.phone || "",
-    address: o.customer?.address || "",
-    
-    // Include user_id and guest_id
-    user_id: o.user_id || null,
-    guest_id: o.guest_id || null,
+      status: o.status || "Pending",
 
+      name: o.customer?.name || "",
+      phone: o.customer?.phone || "",
+      address: o.customer?.address || "",
 
-    // PRODUCTS
-    items: (o.items || []).map((i) => ({
-      product_id: i.product_id,
-      name: i.product_name,
-      size: i.size,
-      quantity: i.quantity,
-      price: i.price
-    })),
+      // USER INFO
+      user_id: o.user_id || null,
+      guest_id: o.guest_id || null,
+      user_name: user ? user.full_name : "Guest",
 
-    // COUPON
-    coupon_code: o.coupon_code || null,
+      // PRODUCTS
+      items: (o.items || []).map((i) => ({
+        product_id: i.product_id,
+        name: i.product_name,
+        size: i.size,
+        quantity: i.quantity,
+        price: i.price
+      })),
 
-    // PRICE DETAILS
-    subtotal: o.subtotal || 0,
-    discount: o.discount || 0,
-    tax: o.tax || 0,
-    delivery: o.delivery || 0,
+      // COUPON
+      coupon_code: o.coupon_code || null,
 
-    total_amount: Number(o.total_amount) || 0
+      // PRICE DETAILS
+      subtotal: o.subtotal || 0,
+      discount: o.discount || 0,
+      tax: o.tax || 0,
+      delivery: o.delivery || 0,
 
-  }));
+      total_amount: Number(o.total_amount) || 0
+    };
+
+  });
 
   res.json(formattedOrders);
-
 });
+
 // -------------------- UPDATE ORDER STATUS --------------------
 
 app.put("/api/admin/orders/:id/status", (req, res) => {
