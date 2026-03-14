@@ -591,9 +591,9 @@ app.get("/api/admin/orders", (req, res) => {
     name: o.customer?.name || "",
     phone: o.customer?.phone || "",
     address: o.customer?.address || "",
-    
+
     // Include user_id and guest_id
-    user_id: o.user_id || null,
+    user_id: o.user.id || null,
     guest_id: o.guest_id || null,
 
 
