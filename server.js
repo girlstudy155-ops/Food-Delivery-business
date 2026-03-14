@@ -582,7 +582,7 @@ app.get("/api/admin/orders", (req, res) => {
 
   const formattedOrders = orders.map((o) => {
 
-    const user = users.find((u) => u.id === o.user_id);
+   const user = users.find((u) => Number(u.id) === Number(o.user_id));
 
     return {
       id: o.id,
