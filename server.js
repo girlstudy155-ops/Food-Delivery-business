@@ -444,78 +444,105 @@ app.post("/api/coupons/validate", (req, res) => {
 
   res.json(coupon);
 });
-// -------------------- CREATE ORDER (USER / GUEST) --------------------
+// -------------------- CREATE ORDER --------------------
+
 app.post("/api/orders", (req, res) => {
-  const {
-    items,
-    address,
-    name,
-    phone,
-    notes,
-    coupon_code,
-    user_id,   // optional for logged-in user
-    guest_id,  // optional for guest
-  } = req.body;
+ const {
+  items,
+  total_amount,
+  address,
+  name,
+  phone,
+  notes,
+  coupon_code,
+  user_id,
+  guest_id
+} = req.body;
+// USER / GUEST VALIDATION
 
-  if (!user_id && !guest_id) {
-    return res.status(400).json({ message: "User ID or Guest ID required" });
-  }
+if (!user_id && !guest_id) {
+  return res.status(400).json({
+    message: "User ID or Guest ID required"
+  });
+}
 
+if (user_id && guest_id) {
+  return res.status(400).json({
+    message: "Order cannot have both user_id and guest_id"
+  });
+}
   if (!items || items.length === 0) {
     return res.status(400).json({ message: "Order items required" });
   }
 
-  // Calculate subtotal
+  // ---------- SUBTOTAL CALCULATION ----------
+
   let subtotal = 0;
-  items.forEach((i) => {
-    subtotal += Number(i.price) * Number(i.quantity);
+
+  items.forEach((item) => {
+    subtotal += Number(item.price) * Number(item.quantity);
   });
 
-  // Apply coupon
+  // ---------- COUPON APPLY ----------
+
   let discount = 0;
+
   if (coupon_code) {
     const coupon = coupons.find(
-      (c) => c.code === coupon_code.toUpperCase() && c.is_active
+      (c) =>
+        c.code === coupon_code.toUpperCase() &&
+        c.is_active !== false
     );
+
     if (coupon) {
-      discount =
-        coupon.discount_type === "percentage"
-          ? (subtotal * coupon.discount_value) / 100
-          : coupon.discount_value;
+      if (coupon.discount_type === "percentage") {
+        discount = (subtotal * coupon.discount_value) / 100;
+      } else {
+        discount = coupon.discount_value;
+      }
     }
   }
 
-  // Tax & Delivery
+  // ---------- TAX & DELIVERY ----------
+
   const TAX_RATE = 0.05;
   const DELIVERY = 2.99;
+
   const tax = (subtotal - discount) * TAX_RATE;
-  const total_amount = subtotal - discount + tax + DELIVERY;
 
-  // Generate order ID
-  const id = orders.length > 0 ? orders[orders.length - 1].id + 1 : 1;
+  const finalTotal =
+    subtotal - discount + tax + DELIVERY;
 
-  // Create order object
+  // ---------- ORDER ID ----------
+
+  const id =
+    orders.length > 0
+      ? orders[orders.length - 1].id + 1
+      : 1;
+
   const newOrder = {
-    id,
-    created_at: new Date().toISOString(),
-    status: "pending",
+  id,
+  created_at: new Date().toISOString(),
+  status: "pending",
 
-    user_id: user_id ? Number(user_id) : null,
-    guest_id: !user_id ? guest_id : null, // only guest_id if no user_id
+ user_id: user_id ? Number(user_id) : null,
+guest_id: !user_id ? guest_id : null,
 
-    customer: {
-      name: name || "",
-      phone: phone || "",
-      address: address || "",
-      notes: notes || "",
-    },
+  customer: {
+    name: name || "",
+    phone: phone || "",
+    address: address || "",
+    notes: notes || "",
+  },
 
     coupon_code: coupon_code || null,
+
     subtotal,
     discount,
     tax,
     delivery: DELIVERY,
-    total_amount,
+
+    total_amount: Number(total_amount) || finalTotal,
 
     items: items.map((i) => ({
       product_id: i.product_id,
@@ -527,33 +554,33 @@ app.post("/api/orders", (req, res) => {
   };
 
   orders.push(newOrder);
+
   saveData(ordersFile, orders);
 
   res.json({
     success: true,
-    message: "Order created successfully",
-    order_id: newOrder.id,
-    total_amount: newOrder.total_amount,
+    id: newOrder.id,
+    total: newOrder.total_amount,
   });
 });
 
-// -------------------- GET ORDERS BY USER/GUEST --------------------
+// -------------------- GET USER ORDERS --------------------
+
 app.get("/api/orders/user", (req, res) => {
+
   const { user_id, guest_id } = req.query;
 
-  if (!user_id && !guest_id) {
-    return res.status(400).json({ message: "User ID or Guest ID required" });
-  }
-
-  let filteredOrders = [];
+  let userOrders = [];
 
   if (user_id) {
-    filteredOrders = orders.filter((o) => o.user_id === Number(user_id));
-  } else if (guest_id) {
-    filteredOrders = orders.filter((o) => o.guest_id === guest_id);
+    userOrders = orders.filter(o => o.user_id == Number(user_id));
+  } 
+  else if (guest_id) {
+    userOrders = orders.filter(o => o.guest_id == guest_id);
   }
 
-  res.json(filteredOrders);
+  res.json(userOrders);
+
 });
 // -------------------- ERROR HANDLER --------------------
 
@@ -770,10 +797,31 @@ app.patch("/api/users/:id/status", (req, res) => {
     user,
   });
 });
+// -------------------- ADMIN DASHBOARD --------------------
+app.get("/api/admin/dashboard", (req, res) => {
+  // Total users
+  const total_users = users.length;
+
+  // Total orders
+  const total_orders = orders.length;
+
+  // Pending orders
+  const pending_orders = orders.filter(o => o.status === "pending").length;
+
+  // Total revenue
+  const total_revenue = orders.reduce((sum, o) => sum + (o.total_amount || 0), 0);
+
+  res.json({
+    total_users,
+    total_orders,
+    pending_orders,
+    total_revenue,
+  });
+});
 // -------------------- START SERVER --------------------
 
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
   console.log(`Backend running on port ${PORT}`);
-});
+}); 
