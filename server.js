@@ -743,6 +743,7 @@ app.post("/api/login", (req, res) => {
       full_name: user.full_name,
       email: user.email,
       profile_image: user.profile_image || "", // <-- include profile image
+      address: user.address,
     },
   });
 });
