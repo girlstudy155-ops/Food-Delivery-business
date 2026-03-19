@@ -744,6 +744,7 @@ app.post("/api/login", (req, res) => {
       email: user.email,
       profile_image: user.profile_image || "", // <-- include profile image
       address: user.address,
+      phone: user.phone,
     },
   });
 });
