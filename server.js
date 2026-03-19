@@ -746,7 +746,29 @@ app.post("/api/login", (req, res) => {
     },
   });
 });
+// -------------------- TOGGLE COUPON --------------------
+app.put("/api/admin/coupons/:id", (req, res) => {
+  const id = Number(req.params.id);
+  const { is_active } = req.body;
 
+  const coupon = coupons.find(c => c.id === id);
+
+  if (!coupon) {
+    return res.status(404).json({ message: "Coupon not found" });
+  }
+
+  // update status
+  coupon.is_active = Boolean(is_active);
+
+  // save file
+  saveData(couponsFile, coupons);
+
+  res.json({
+    success: true,
+    message: `Coupon is now ${coupon.is_active ? "Active" : "Inactive"}`,
+    coupon
+  });
+});
 // ---------------- GET USERS ----------------
 app.get("/api/users", (req, res) => {
   const safeUsers = users.map((u) => ({
@@ -757,6 +779,7 @@ app.get("/api/users", (req, res) => {
     phone: u.phone,
     profile_image: u.profile_image || "", // <-- include profile image
     created_at: u.created_at,
+    isActive: u.isActive !== false, // ✅ ADD THIS LINE
   }));
 
   res.json(safeUsers);
