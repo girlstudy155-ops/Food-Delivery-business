@@ -110,48 +110,62 @@ export default function RegisterScreen() {
   };
 
   const handleRegister = async () => {
-    if (!validate()) return;
-    setIsLoading(true);
+  if (!validate()) return;
+    if (!remember) {
+    Alert.alert("Enable Remember Me", "Please enable Remember Me to create account");
+    return;
+  }
+  setIsLoading(true);
 
-    try {
-      const res = await fetch(API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          full_name: form.full_name,
-          email: form.email,
-          password: form.password,
-          address: form.address,
-          phone: form.phone,
-          profile_image: profileImage || "",
-        }),
+  try {
+    const res = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        full_name: form.full_name,
+        email: form.email,
+        password: form.password,
+        address: form.address,
+        phone: form.phone,
+        profile_image: profileImage || "",
+      }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || "Registration failed");
+
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+    // ✅ Remember Me logic
+    if (remember) {
+      const userToSave = {
+        full_name: form.full_name,
+        email: form.email,
+        address: form.address,
+        phone: form.phone,
+        profile_image: profileImage || "",
+      };
+      await AsyncStorage.setItem("rememberUser", JSON.stringify(userToSave));
+      setSavedUser(userToSave);
+    } else {
+      // Agar unchecked ho to user save na ho lekin account backend pe register ho jaye
+      await AsyncStorage.removeItem("rememberUser");
+      setSavedUser({
+        full_name: form.full_name,
+        email: form.email,
+        address: form.address,
+        phone: form.phone,
+        profile_image: profileImage || "",
       });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Registration failed");
-
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
-      // Save user if Remember Me checked
-      if (remember) {
-        const userToSave = {
-          full_name: form.full_name,
-          email: form.email,
-          address: form.address,
-          phone: form.phone,
-          profile_image: profileImage || "",
-        };
-        await AsyncStorage.setItem("rememberUser", JSON.stringify(userToSave));
-        setSavedUser(userToSave);
-      }
-
-      setSuccessModal(true);
-    } catch (err: any) {
-      Alert.alert("Registration Failed", err.message);
-    } finally {
-      setIsLoading(false);
     }
-  };
+
+    setSuccessModal(true);
+  } catch (err: any) {
+    Alert.alert("Registration Failed", err.message);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const handleLogout = async () => {
     Alert.alert("Logout", "Are you sure you want to logout?", [

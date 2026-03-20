@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,8 +8,8 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
-  RefreshControl,
   Modal,
+  RefreshControl,
 } from "react-native";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -23,19 +23,23 @@ const ORDER_STATUSES = ["Pending", "Confirmed", "Preparing", "Out for Delivery",
 
 // ---------------- API ----------------
 async function fetchAdminOrders(token: string) {
-  const res = await fetch(`https://food-delivery-business-production-00a9.up.railway.app/api/admin/orders`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const res = await fetch(
+    `https://food-delivery-business-production-00a9.up.railway.app/api/admin/orders`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
   if (!res.ok) throw new Error("Failed to fetch orders");
   return res.json();
 }
 
 async function updateOrderStatus(token: string, orderId: number, status: string) {
-  const res = await fetch(`https://food-delivery-business-production-00a9.up.railway.app/api/admin/orders/${orderId}/status`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ status }),
-  });
+  const res = await fetch(
+    `https://food-delivery-business-production-00a9.up.railway.app/api/admin/orders/${orderId}/status`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ status }),
+    }
+  );
   if (!res.ok) throw new Error("Failed to update status");
   return res.json();
 }
@@ -64,29 +68,47 @@ export default function AdminOrdersScreen() {
   const queryClient = useQueryClient();
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [statusModal, setStatusModal] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
-  const { data: orders = [], isLoading, refetch, isFetching } = useQuery({
+  const { data: orders = [], isLoading, refetch } = useQuery({
     queryKey: ["admin-orders", token],
     queryFn: () => fetchAdminOrders(token!),
     enabled: !!token,
+    refetchInterval: 10000, // auto refresh every 10s
   });
 
-  // ---------------- MUTATION ----------------
   const mutation = useMutation({
     mutationFn: ({ orderId, status }: { orderId: number; status: string }) =>
       updateOrderStatus(token!, orderId, status),
-    onSuccess: (updatedOrder) => {
-      // 1️⃣ Update orders list
-      queryClient.setQueryData(["admin-orders", token], (old: any) => {
-        if (!old) return [];
-        return old.map((o: any) => (o.id === updatedOrder.id ? updatedOrder : o));
-      });
-      // 2️⃣ Update selected order immediately so modal shows new status
-      setSelectedOrder((prev: any) => (prev?.id === updatedOrder.id ? updatedOrder : prev));
+    onMutate: async ({ orderId, status }) => {
+      await queryClient.cancelQueries({ queryKey: ["admin-orders", token] });
+      const previousOrders = queryClient.getQueryData(["admin-orders", token]);
+
+      queryClient.setQueryData(["admin-orders", token], (old: any = []) =>
+        old.map((o: any) => (o.id === orderId ? { ...o, status } : o))
+      );
+
+      setSelectedOrder((prev: any) => (prev?.id === orderId ? { ...prev, status } : prev));
+      return { previousOrders };
     },
-    onError: () => Alert.alert("Error", "Failed to update status"),
+    onError: (err, variables, context) => {
+      queryClient.setQueryData(["admin-orders", token], context?.previousOrders);
+      Alert.alert("Error", "Failed to update status");
+    },
   });
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refetch();
+    } catch (e) {
+      console.log("Refresh error:", e);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetch]);
 
   return (
     <View style={styles.container}>
@@ -103,8 +125,8 @@ export default function AdminOrdersScreen() {
       <ScrollView
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
-        contentInsetAdjustmentBehavior="automatic"
-        refreshControl={<RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={colors.primary} />}
+        contentContainerStyle={{ paddingTop: 10 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
       >
         {isLoading ? (
           <ActivityIndicator color={colors.primary} style={{ marginTop: 48 }} />
@@ -116,12 +138,10 @@ export default function AdminOrdersScreen() {
         ) : (
           <View style={styles.list}>
             {orders.map((order: any) => (
-              <Pressable
+              <View
                 key={order.id}
                 style={styles.orderCard}
-                onPress={() => { setSelectedOrder(order); setStatusModal(true); }}
               >
-                {/* HEADER */}
                 <View style={styles.orderHeader}>
                   <View>
                     <Text style={styles.orderId}>Order #{order.id}</Text>
@@ -132,7 +152,6 @@ export default function AdminOrdersScreen() {
                   <StatusPill status={order.status} />
                 </View>
 
-                {/* CUSTOMER INFO */}
                 <View style={styles.orderInfo}>
                   <View style={styles.infoRow}>
                     <Ionicons name="person-outline" size={13} color={colors.textSecondary} />
@@ -146,7 +165,8 @@ export default function AdminOrdersScreen() {
                     <Ionicons name="location-outline" size={13} color={colors.textSecondary} />
                     <Text style={styles.infoText} numberOfLines={1}>{order.address}</Text>
                   </View>
-                  {/* PRODUCTS */}
+
+                  {/* ORDER ITEMS */}
                   <View style={{ marginTop: 6 }}>
                     {order.items?.map((item: any, i: number) => (
                       <Text key={i} style={{ fontSize: 12, color: "#555" }}>
@@ -160,14 +180,14 @@ export default function AdminOrdersScreen() {
                 <View style={styles.orderFooter}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.itemCount}>{(order.items || []).length} items</Text>
-                    {order.coupon_code && (
-                      <Text style={{ fontSize: 11, color: "#10B981" }}>Coupon: {order.coupon_code}</Text>
-                    )}
+                    {order.coupon_code && <Text style={{ fontSize: 11, color: "#10B981" }}>Coupon: {order.coupon_code}</Text>}
                   </View>
                   <Text style={styles.orderTotal}>${parseFloat(order.total_amount).toFixed(2)}</Text>
-                  <Text style={styles.tapHint}>Tap to change status</Text>
+                  <Pressable onPress={() => { setSelectedOrder(order); setStatusModal(true); }}>
+                    <Text style={styles.tapHint}>Tap to change status</Text>
+                  </Pressable>
                 </View>
-              </Pressable>
+              </View>
             ))}
           </View>
         )}
@@ -181,8 +201,11 @@ export default function AdminOrdersScreen() {
             <View style={styles.modalHandle} />
             <Text style={styles.modalTitle}>Update Order Status</Text>
             {selectedOrder && (
-              <Text style={styles.modalSubtitle}>Order #{selectedOrder.id} — {selectedOrder.name}</Text>
+              <Text style={styles.modalSubtitle}>
+                Order #{selectedOrder.id} — {selectedOrder.name}
+              </Text>
             )}
+
             <View style={styles.statusList}>
               {ORDER_STATUSES.map((status) => {
                 const isSelected = selectedOrder?.status === status;
@@ -201,6 +224,7 @@ export default function AdminOrdersScreen() {
                 );
               })}
             </View>
+
             {mutation.isPending && <ActivityIndicator color={colors.primary} style={{ marginTop: 12 }} />}
           </Pressable>
         </Pressable>

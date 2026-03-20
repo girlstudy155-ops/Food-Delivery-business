@@ -205,17 +205,21 @@ const { isDarkTheme, toggleTheme, theme } = useTheme();
  useEffect(() => {
   const initUserAndGuest = async () => {
     const storedUser = await AsyncStorage.getItem("rememberUser");
+    const currentUser = await AsyncStorage.getItem("currentUser");
+
     if (storedUser) {
       setUser(JSON.parse(storedUser));
+      return;
+    } else if (currentUser) {
+      setUser(JSON.parse(currentUser));
       return;
     }
 
     let guest = await AsyncStorage.getItem("guest_id");
     if (!guest) {
-      guest = `GUEST_${Math.floor(Math.random() * 9000) + 1000}`;
+      guest = `Guest#${Math.floor(Math.random() * 9000) + 1000}`;
       await AsyncStorage.setItem("guest_id", guest);
     }
-
     setGuestId(guest);
   };
 
@@ -236,7 +240,7 @@ const { isDarkTheme, toggleTheme, theme } = useTheme();
     setRefreshing(false);
   }, [selectedCategory]);
 
- const handleLogout = () => {
+const handleLogout = () => {
   Alert.alert(
     "Logout",
     "Are you sure you want to logout?",
@@ -246,17 +250,18 @@ const { isDarkTheme, toggleTheme, theme } = useTheme();
         text: "Logout",
         style: "destructive",
         onPress: async () => {
-          // Remove user info
+          // Clear user and remembered data
           await AsyncStorage.removeItem("rememberUser");
+          await AsyncStorage.removeItem("currentUser");
           clearCart();
           setUser(null);
 
-          // Generate a new guest ID after logout
-          const newGuest = `GUEST_${Math.floor(Math.random() * 9000) + 1000}`;
+          // Generate new guest ID
+          const newGuest = `Guest#${Math.floor(Math.random() * 9000) + 1000}`;
           await AsyncStorage.setItem("guest_id", newGuest);
           setGuestId(newGuest);
 
-          // Redirect to auth or home
+          // Redirect to home
           router.replace("/(auth)");
         },
       },
@@ -277,14 +282,16 @@ const { isDarkTheme, toggleTheme, theme } = useTheme();
       style={styles.avatar}
     />
           )}
-          <View style={styles.headerLeftText}>
-            {user?.address && (
-              <>
-                <Text style={styles.locationLabel}>Deliver to</Text>
-                <Text style={styles.locationText} numberOfLines={1}>{user.address}</Text>
-              </>
-            )}
-          </View>
+      <View style={styles.headerLeftText}>
+  {user?.address && (
+    <>
+      <Text style={styles.locationLabel}>Deliver to</Text>
+      <Text style={styles.locationText} numberOfLines={1}>
+        {user.address}
+      </Text>
+    </>
+  )}
+</View>
         </View>
 
         <View style={styles.headerRight}>

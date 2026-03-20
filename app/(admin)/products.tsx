@@ -17,6 +17,7 @@ import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
+import { KeyboardAvoidingView } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import colors from "@/constants/colors";
 
@@ -330,6 +331,10 @@ export default function AdminProductsScreen() {
       {/* Modal */}
       <Modal visible={modal} transparent animationType="slide">
         <Pressable style={styles.modalOverlay} onPress={() => setModal(false)}>
+           <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      style={{ flex: 1 }}
+    >
           <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
             <ScrollView keyboardShouldPersistTaps="handled">
               <View style={styles.modalHandle} />
@@ -436,6 +441,7 @@ export default function AdminProductsScreen() {
               <View style={{ height: 20 }} />
             </ScrollView>
           </Pressable>
+         </KeyboardAvoidingView>
         </Pressable>
       </Modal>
     </View>

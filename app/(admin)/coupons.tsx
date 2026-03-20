@@ -16,6 +16,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import colors from "@/constants/colors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { KeyboardAvoidingView } from "react-native";
 
 const BASE_URL = "https://food-delivery-business-production-00a9.up.railway.app/";
 
@@ -115,23 +116,29 @@ export default function AdminCouponsScreen() {
 
   // ---------------- TOGGLE COUPON ----------------
 
-  const toggleCoupon = async (id: number, is_active: boolean) => {
-    try {
-      const res = await fetch(`${BASE_URL}api/admin/coupons/${id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ is_active }),
-      });
+ const toggleCoupon = async (id: number, is_active: boolean) => {
+  try {
+    const res = await fetch(`${BASE_URL}api/admin/coupons/${id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ is_active }),
+    });
 
-      if (!res.ok) throw new Error("Toggle failed");
+    if (!res.ok) throw new Error("Toggle failed");
 
-      fetchCoupons();
-    } catch (e: any) {
-      Alert.alert("Error", e.message);
-    }
-  };
+    // instant UI update (no reload)
+    setCoupons(prev =>
+      prev.map(c =>
+        c.id === id ? { ...c, is_active } : c
+      )
+    );
+
+  } catch (e: any) {
+    Alert.alert("Error", e.message);
+  }
+};
 
   // ---------------- DELETE COUPON ----------------
 
@@ -352,6 +359,11 @@ export default function AdminCouponsScreen() {
           style={styles.modalOverlay}
           onPress={() => setModal(false)}
         >
+           <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"} // iOS padding, Android height
+      keyboardVerticalOffset={Platform.OS === "ios" ? 50 : 20} // adjust for header if needed
+    >
           <Pressable
             style={styles.modalContent}
             onPress={(e) => e.stopPropagation()}
@@ -453,6 +465,7 @@ export default function AdminCouponsScreen() {
               </View>
             </ScrollView>
           </Pressable>
+          </KeyboardAvoidingView>
         </Pressable>
       </Modal>
     </View>

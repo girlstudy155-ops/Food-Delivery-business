@@ -14,18 +14,15 @@ import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
-import { fetch } from "expo/fetch";
 import colors from "@/constants/colors";
 import { useAuth } from "@/contexts/auth";
 import { useCart } from "@/contexts/cart";
-import { getApiUrl } from "@/lib/query-client";
 
 async function fetchDashboard(token: string) {
-  const base = getApiUrl();
-  const res = await fetch(`${base}api/admin/dashboard`, {
+  const res = await fetch("https://food-delivery-business-production-00a9.up.railway.app/api/admin/dashboard", {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) throw new Error("Failed");
+  if (!res.ok) throw new Error("Failed to fetch dashboard");
   return res.json();
 }
 

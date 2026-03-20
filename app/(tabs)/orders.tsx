@@ -1,5 +1,4 @@
-// OrdersScreen.tsx
-import React, { useState, useEffect } from "react";
+ import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -13,16 +12,19 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useTheme } from "@/contexts/ThemeContext";
+import { useTheme } from "@/contexts/ThemeContext"; // <-- theme context
 
-// ---------------- STATUS BADGE ----------------
+// -------------------- STATUS BADGE --------------------
 function StatusBadge({ status, theme }: { status: string; theme: any }) {
-  const statusColor = theme.primary;
+  const statusColor = theme.primary; // you can customize per status if you want
   return (
     <View
       style={[
         statusStyles.badge,
-        { backgroundColor: statusColor + "20", borderColor: statusColor + "40" },
+        {
+          backgroundColor: statusColor + "20",
+          borderColor: statusColor + "40",
+        },
       ]}
     >
       <View style={[statusStyles.dot, { backgroundColor: statusColor }]} />
@@ -32,23 +34,38 @@ function StatusBadge({ status, theme }: { status: string; theme: any }) {
 }
 
 const statusStyles = StyleSheet.create({
-  badge: { flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1 },
+  badge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderWidth: 1,
+  },
   dot: { width: 6, height: 6, borderRadius: 3 },
   text: { fontSize: 11, fontWeight: "700" },
 });
 
-// ---------------- ORDER CARD ----------------
+// -------------------- ORDER CARD --------------------
 function OrderCard({ order, theme }: { order: any; theme: any }) {
   const [expanded, setExpanded] = useState(false);
+
   const date = new Date(order.created_at || Date.now()).toLocaleDateString("en-US", {
-    month: "short", day: "numeric", year: "numeric",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
   });
 
   return (
     <Pressable
-      style={[orderStyles.card, { backgroundColor: theme.cardBackground, shadowColor: theme.shadow }]}
+      style={[
+        orderStyles.card,
+        { backgroundColor: theme.cardBackground, shadowColor: theme.shadow },
+      ]}
       onPress={() => setExpanded(!expanded)}
     >
+      {/* Header */}
       <View style={orderStyles.header}>
         <View style={{ flex: 1 }}>
           <Text style={[orderStyles.orderId, { color: theme.text }]}>
@@ -58,12 +75,17 @@ function OrderCard({ order, theme }: { order: any; theme: any }) {
         </View>
         <View style={{ alignItems: "flex-end", gap: 6 }}>
           <StatusBadge status={order.status || "Pending"} theme={theme} />
-          <Ionicons name={expanded ? "chevron-up" : "chevron-down"} size={16} color={theme.textLight} />
+          <Ionicons
+            name={expanded ? "chevron-up" : "chevron-down"}
+            size={16}
+            color={theme.textLight}
+          />
         </View>
       </View>
 
       <View style={[orderStyles.divider, { backgroundColor: theme.textLight + "40" }]} />
 
+      {/* Summary */}
       <View style={orderStyles.summary}>
         <View style={orderStyles.summaryRow}>
           <Ionicons name="bag-outline" size={14} color={theme.textSecondary} />
@@ -71,11 +93,18 @@ function OrderCard({ order, theme }: { order: any; theme: any }) {
             {(order.items || []).length} item(s)
           </Text>
         </View>
+        <View style={orderStyles.summaryRow}>
+          <Ionicons name="cash-outline" size={14} color={theme.textSecondary} />
+          <Text style={[orderStyles.summaryText, { color: theme.textSecondary }]}>
+            Cash on Delivery
+          </Text>
+        </View>
         <Text style={[orderStyles.total, { color: theme.primary }]}>
           ${Number(order.total_amount || 0).toFixed(2)}
         </Text>
       </View>
 
+      {/* Expanded Details */}
       {expanded && (
         <View style={orderStyles.expandedContent}>
           <View style={[orderStyles.divider, { backgroundColor: theme.textLight + "40" }]} />
@@ -106,51 +135,46 @@ function OrderCard({ order, theme }: { order: any; theme: any }) {
   );
 }
 
-// ---------------- MAIN SCREEN ----------------
+// -------------------- MAIN ORDERS SCREEN --------------------
 export default function OrdersScreen() {
   const insets = useSafeAreaInsets();
-  const { theme } = useTheme();
-  const [userOrders, setUserOrders] = useState<any[]>([]);
+  const { theme } = useTheme(); // <-- use theme
   const [guestOrders, setGuestOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [orders, setOrders] = useState<any[]>([]);
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
-  // Load guest orders from AsyncStorage
+  // Load guest orders
   useEffect(() => {
     AsyncStorage.getItem("guest_orders_session").then((data) => {
       if (data) setGuestOrders(JSON.parse(data));
     });
   }, []);
 
-  // Fetch user orders dynamically
+  // Fetch user orders
   useEffect(() => {
     const fetchOrders = async () => {
       setLoading(true);
       try {
-        const userId = await AsyncStorage.getItem("user_id");
-        if (!userId) {
-          setUserOrders([]);
-          return;
-        }
-
-        const res = await fetch(`https://food-delivery-business-production-00a9.up.railway.app/api/admin/orders`);
+        const res = await fetch("https://food-delivery-business-production-00a9.up.railway.app/api/admin/orders");
+        if (!res.ok) throw new Error("Failed to fetch orders");
         const data = await res.json();
-        setUserOrders(data);
+        setOrders(data);
       } catch (err) {
-        console.log("Error fetching user orders:", err);
+        console.log("Fetch error:", err);
+        setOrders([]);
       } finally {
         setLoading(false);
       }
     };
-
     fetchOrders();
   }, []);
 
-  // Merge guest + user orders
+  // Merge guest + user orders, remove duplicates
   const displayOrders = (() => {
     const map = new Map();
     guestOrders.forEach((order) => order.guest_order_id && map.set(`guest-${order.guest_order_id}`, order));
-    userOrders.forEach((order) => order.id && map.set(`user-${order.id}`, order));
+    orders.forEach((order) => order.id && map.set(`user-${order.id}`, order));
     return Array.from(map.values());
   })();
 
@@ -163,7 +187,7 @@ export default function OrdersScreen() {
         {guestOrders.length > 0 && (
           <View style={styles.guestBanner}>
             <Ionicons name="information-circle-outline" size={14} color="rgba(255,255,255,0.85)" />
-            <Text style={styles.guestBannerText}>Guest orders cleared when app closes</Text>
+            <Text style={styles.guestBannerText}>Orders cleared when app closes</Text>
           </View>
         )}
       </LinearGradient>
@@ -184,9 +208,14 @@ export default function OrdersScreen() {
             </View>
           ) : (
             <View style={styles.ordersList}>
-              {displayOrders.map((order, i) => (
-                <OrderCard key={order.id || order.guest_order_id || i} order={order} theme={theme} />
-              ))}
+              {displayOrders.map((order, index) => {
+                const key = order.id
+                  ? `user-${order.id}`
+                  : order.guest_order_id
+                  ? `guest-${order.guest_order_id}`
+                  : `unknown-${index}`;
+                return <OrderCard key={key} order={order} theme={theme} />;
+              })}
             </View>
           )}
         </View>
@@ -196,9 +225,16 @@ export default function OrdersScreen() {
   );
 }
 
-// ---------------- STYLES ----------------
+// -------------------- STYLES --------------------
 const orderStyles = StyleSheet.create({
-  card: { borderRadius: 18, padding: 16, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 4 },
+  card: {
+    borderRadius: 18,
+    padding: 16,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 8,
+    elevation: 4,
+  },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
   orderId: { fontSize: 15, fontWeight: "700" },
   orderDate: { fontSize: 12, marginTop: 2 },
@@ -230,4 +266,4 @@ const styles = StyleSheet.create({
   emptyIcon: { width: 110, height: 110, borderRadius: 55, alignItems: "center", justifyContent: "center", marginBottom: 8 },
   emptyTitle: { fontSize: 22, fontWeight: "700" },
   emptySubtitle: { fontSize: 14, textAlign: "center", lineHeight: 20, paddingHorizontal: 24 },
-});
+}); 

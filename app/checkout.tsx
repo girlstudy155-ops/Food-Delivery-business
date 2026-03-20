@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+
 import colors from "@/constants/colors";
 import { useAuth } from "@/contexts/auth";
 import { useCart } from "@/contexts/cart";
@@ -43,9 +44,41 @@ export default function CheckoutScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+// <-- ADD THIS USEEFFECT HERE, AFTER STATE DECLARATIONS
+useEffect(() => {
+  const loadSavedUser = async () => {
+    try {
+      // Check if guest or logged-in
+      if (!isGuest && user) {
+        // Logged-in user from backend
+        setName(user.full_name || "");
+        setPhone(user.phone || "");
+        setAddress(user.address || "");
+      } else {
+        // Guest or remember me
+        const savedUserStr = await AsyncStorage.getItem("rememberUser");
+        if (savedUserStr) {
+          const savedUser = JSON.parse(savedUserStr);
+          setName(savedUser.full_name || "");
+          setPhone(savedUser.phone || "");
+          setAddress(savedUser.address || "");
+        } else {
+          // No saved data, empty fields
+          setName("");
+          setPhone("");
+          setAddress("");
+        }
+      }
+    } catch (err) {
+      console.log("Error loading saved user:", err);
+    }
+  };
+
+  loadSavedUser();
+}, [user, isGuest]);
+
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
-
   const DELIVERY_CHARGE = 2.99;
 
   const validate = () => {
@@ -189,7 +222,10 @@ export default function CheckoutScreen() {
               style={[
                 styles.inputRow,
                 errors.name && styles.inputError,
-                { backgroundColor: theme.cardBackground, borderColor: errors.name ? colors.error : theme.border },
+                {
+                  backgroundColor: theme.cardBackground,
+                  borderColor: errors.name ? colors.error : theme.border,
+                },
               ]}
             >
               <Ionicons
@@ -206,18 +242,25 @@ export default function CheckoutScreen() {
               />
             </View>
             {errors.name && (
-              <Text style={[styles.fieldError, { color: colors.error }]}>{errors.name}</Text>
+              <Text style={[styles.fieldError, { color: colors.error }]}>
+                {errors.name}
+              </Text>
             )}
           </View>
 
           {/* Phone */}
           <View style={styles.fieldGroup}>
-            <Text style={[styles.label, { color: theme.text }]}>Phone Number</Text>
+            <Text style={[styles.label, { color: theme.text }]}>
+              Phone Number
+            </Text>
             <View
               style={[
                 styles.inputRow,
                 errors.phone && styles.inputError,
-                { backgroundColor: theme.cardBackground, borderColor: errors.phone ? colors.error : theme.border },
+                {
+                  backgroundColor: theme.cardBackground,
+                  borderColor: errors.phone ? colors.error : theme.border,
+                },
               ]}
             >
               <Ionicons
@@ -235,19 +278,26 @@ export default function CheckoutScreen() {
               />
             </View>
             {errors.phone && (
-              <Text style={[styles.fieldError, { color: colors.error }]}>{errors.phone}</Text>
+              <Text style={[styles.fieldError, { color: colors.error }]}>
+                {errors.phone}
+              </Text>
             )}
           </View>
 
           {/* Address */}
           <View style={styles.fieldGroup}>
-            <Text style={[styles.label, { color: theme.text }]}>Delivery Address</Text>
+            <Text style={[styles.label, { color: theme.text }]}>
+              Delivery Address
+            </Text>
             <View
               style={[
                 styles.inputRow,
                 styles.textAreaRow,
                 errors.address && styles.inputError,
-                { backgroundColor: theme.cardBackground, borderColor: errors.address ? colors.error : theme.border },
+                {
+                  backgroundColor: theme.cardBackground,
+                  borderColor: errors.address ? colors.error : theme.border,
+                },
               ]}
             >
               <Ionicons
@@ -267,13 +317,17 @@ export default function CheckoutScreen() {
               />
             </View>
             {errors.address && (
-              <Text style={[styles.fieldError, { color: colors.error }]}>{errors.address}</Text>
+              <Text style={[styles.fieldError, { color: colors.error }]}>
+                {errors.address}
+              </Text>
             )}
           </View>
 
           {/* Notes */}
           <View style={styles.fieldGroup}>
-            <Text style={[styles.label, { color: theme.text }]}>Order Notes (Optional)</Text>
+            <Text style={[styles.label, { color: theme.text }]}>
+              Order Notes (Optional)
+            </Text>
             <View
               style={[
                 styles.inputRow,
@@ -302,15 +356,27 @@ export default function CheckoutScreen() {
 
         {/* Payment Method */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Payment Method</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>
+            Payment Method
+          </Text>
           <View
-            style={[styles.paymentCard, { backgroundColor: theme.cardBackground, borderColor: colors.primary }]}
+            style={[
+              styles.paymentCard,
+              { backgroundColor: theme.cardBackground, borderColor: colors.primary },
+            ]}
           >
-            <View style={[styles.paymentIcon, { backgroundColor: theme.successBackground || "#ECFDF5" }]}>
+            <View
+              style={[
+                styles.paymentIcon,
+                { backgroundColor: theme.successBackground || "#ECFDF5" },
+              ]}
+            >
               <Ionicons name="cash" size={24} color={colors.success} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.paymentTitle, { color: theme.text }]}>Cash on Delivery</Text>
+              <Text style={[styles.paymentTitle, { color: theme.text }]}>
+                Cash on Delivery
+              </Text>
               <Text style={[styles.paymentSubtitle, { color: theme.textSecondary }]}>
                 Pay when your order arrives
               </Text>
@@ -327,9 +393,15 @@ export default function CheckoutScreen() {
           <View style={[styles.summaryCard, { backgroundColor: theme.cardBackground }]}>
             {items.map((item) => (
               <View key={`${item.product_id}-${item.size}`} style={styles.orderItem}>
-                <Text style={[styles.orderItemName, { color: theme.text }]}>{item.name} ({item.size})</Text>
-                <Text style={[styles.orderItemQty, { color: theme.textSecondary }]}>x{item.quantity}</Text>
-                <Text style={[styles.orderItemPrice, { color: theme.text }]}>${(item.price * item.quantity).toFixed(2)}</Text>
+                <Text style={[styles.orderItemName, { color: theme.text }]}>
+                  {item.name} ({item.size})
+                </Text>
+                <Text style={[styles.orderItemQty, { color: theme.textSecondary }]}>
+                  x{item.quantity}
+                </Text>
+                <Text style={[styles.orderItemPrice, { color: theme.text }]}>
+                  ${(item.price * item.quantity).toFixed(2)}
+                </Text>
               </View>
             ))}
             <View style={[styles.divider, { backgroundColor: theme.borderLight }]} />

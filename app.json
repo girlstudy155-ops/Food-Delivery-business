@@ -17,15 +17,13 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.foodrush"
     },
-    "android": {
-      "package": "com.foodrush",
-      "adaptiveIcon": {
-        "backgroundColor": "#FF4500",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
-      }
-    },
+   "android": {
+  "package": "com.foodrush",
+  "adaptiveIcon": {
+    "foregroundImage": "./assets/images/icon.png",
+    "backgroundColor": "#FF4500"
+  }
+},
     "web": {
       "favicon": "./assets/images/favicon.png"
     },

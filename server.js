@@ -3,7 +3,6 @@ import cors from "cors";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import axios from "axios"; // ✅ ADD HERE
 import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -642,7 +641,7 @@ app.get("/api/admin/orders", (req, res) => {
 
 // -------------------- UPDATE ORDER STATUS --------------------
 
-app.put("/api/admin/orders/:id/status", async (req, res) => {
+app.put("/api/admin/orders/:id/status", (req, res) => {
   const id = Number(req.params.id);
   const { status } = req.body;
 
@@ -655,18 +654,6 @@ app.put("/api/admin/orders/:id/status", async (req, res) => {
   order.status = status;
 
   saveData(ordersFile, orders);
-
-  // 🔍 FIND USER
-  let user = null;
-
-  if (order.user_id) {
-    user = users.find((u) => Number(u.id) === Number(order.user_id));
-  }
-
-  // 🔔 SEND NOTIFICATION
-  if (user && user.expoPushToken) {
-    await sendNotification(user.expoPushToken, status, order.id);
-  }
 
   res.json({
     success: true,
@@ -713,7 +700,6 @@ app.post("/api/register", (req, res) => {
     address: address || "",
     phone: phone || "",
     profile_image: profile_image || "", // <-- added field
-     expoPushToken: null, // ✅ ADD HERE
     created_at: new Date().toISOString(),
   };
 
@@ -855,42 +841,6 @@ app.get("/api/admin/dashboard", (req, res) => {
     total_orders,
     pending_orders,
     total_revenue,
-  });
-});
-// 🔔 SEND NOTIFICATION FUNCTION
-async function sendNotification(pushToken, status, orderId) {
-  if (!pushToken) return;
-
-  const message = {
-    to: pushToken,
-    sound: "default",
-    title: "FoodRush 🍔",
-    body: `Order #${orderId} is now ${status}`,
-  };
-
-  try {
-    await axios.post("https://exp.host/--/api/v2/push/send", message);
-  } catch (err) {
-    console.log("Notification error:", err.message);
-  }
-}
-// ---------------- SAVE PUSH TOKEN ----------------
-app.post("/api/save-token", (req, res) => {
-  const { userId, expoPushToken } = req.body;
-
-  const user = users.find((u) => u.id === Number(userId));
-
-  if (!user) {
-    return res.status(404).json({ message: "User not found" });
-  }
-
-  user.expoPushToken = expoPushToken;
-
-  saveData(usersFile, users);
-
-  res.json({
-    success: true,
-    message: "Push token saved",
   });
 });
 // -------------------- START SERVER --------------------
